@@ -33,8 +33,6 @@ echo "Commit: $SHA"
 echo "Serviço: $SERVICE"
 echo "=========================================="
 
-# O serviço FastAPI é compartilhado pelos dois repositórios.
-# Um único lock impede reinícios concorrentes e evita que um deploy sobrescreva o outro.
 exec 200>"$LOCK"
 flock -n 200 || { set_status failure "Outro deploy que usa o serviço FastAPI já está em execução."; exit 1; }
 
@@ -46,10 +44,18 @@ git rev-parse HEAD
 
 "$VENV/bin/python" -m pip install -r "$REPO/requirements.txt"
 "$VENV/bin/python" -m pip check
-"$VENV/bin/python" -c "import main; print('IMPORT MAIN OK')"
 
-# Não altera a unidade systemd durante o deploy. O entrypoint já existente
-# do serviço foi tornado compatível com o agregador, portanto basta reiniciar.
+# Captura o traceback completo no log/status para diagnosticar falhas de import.
+import_output=""
+if ! import_output=$("$VENV/bin/python" -c "import main; print('IMPORT MAIN OK')" 2>&1); then
+    echo "$import_output"
+    compact_error=$(printf '%s' "$import_output" | tail -n 8 | tr '\n' ' ' | cut -c1-1800)
+    set_status failure "Falha ao importar main: $compact_error"
+    exit 1
+fi
+echo "$import_output"
+
+# Não altera a unidade systemd durante o deploy.
 /usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
 
 for i in $(seq 1 20); do
