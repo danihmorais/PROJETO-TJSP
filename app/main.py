@@ -84,12 +84,12 @@ def source_from_input(item: SourceInput) -> Source:
 
 
 async def build_compilation(sources: list[Source]) -> tuple[list[CompilationEntry], datetime]:
-    selected = [source for source in sources if getattr(source, "enabled", True)]
-    if not selected:
+    if not sources:
         raise HTTPException(status_code=400, detail="Nenhuma legislação habilitada")
-    fetched = await asyncio.gather(*(fetch_source(source) for source in selected), return_exceptions=True)
+
+    fetched = await asyncio.gather(*(fetch_source(source) for source in sources), return_exceptions=True)
     entries: list[CompilationEntry] = []
-    for source, result in zip(selected, fetched):
+    for source, result in zip(sources, fetched):
         if isinstance(result, Exception):
             entries.append(CompilationEntry(source, [], datetime.now(timezone.utc), str(result)))
         else:
@@ -131,7 +131,10 @@ async def fontes():
 
 @app.post("/api/compilar")
 async def api_compilar(request: CompileRequest):
-    sources = [source_from_input(item) for item in request.sources]
+    selected = [item for item in request.sources if item.enabled]
+    if not selected:
+        raise HTTPException(status_code=400, detail="Nenhuma legislação habilitada")
+    sources = [source_from_input(item) for item in selected]
     entries, generated_at = await build_compilation(sources)
     if request.format == "html":
         return HTMLResponse(render_html(entries, generated_at))
