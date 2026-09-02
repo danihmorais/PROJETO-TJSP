@@ -4,6 +4,9 @@ from fastapi.testclient import TestClient
 from app.config import SOURCES
 from app.legislation import article_in_ranges, clean_text, extract_articles
 from app.main import app
+from app.render import parse_legal_units, render_html
+from app.legislation import Device
+from datetime import datetime, timezone
 
 
 @pytest.fixture
@@ -97,3 +100,30 @@ def test_compile_rejects_all_sources_disabled(client):
     response = client.post("/api/compilar", json={"sources": [item], "format": "json"})
     assert response.status_code == 400
     assert response.json()["detail"] == "Nenhuma legislação habilitada"
+
+
+def test_parse_legal_units_keeps_caput_and_structures_paragraphs_and_incisos():
+    device = Device(
+        "5",
+        "Art. 5º Texto do caput.\n§ 1º Texto do parágrafo.\nI - Primeiro inciso.\nII - Segundo inciso."
+    )
+    units = parse_legal_units(device)
+    assert [(kind, label) for kind, label, _ in units] == [
+        ("caput", None), ("paragraph", "§ 1º"), ("inciso", "I"), ("inciso", "II")
+    ]
+    assert "Texto do caput" in units[0][2]
+
+
+def test_render_html_contains_study_navigation_and_verbatim_article_structure():
+    source = SOURCES[0]
+    entry = type("Entry", (), {
+        "source": source,
+        "devices": [Device("293", "Art. 293 Texto do caput.\nI - Inciso.")],
+        "consulted_at": datetime.now(timezone.utc),
+        "error": None,
+    })()
+    html = render_html([entry], datetime.now(timezone.utc))
+    assert "Buscar na lei seca" in html
+    assert "Modo foco" in html
+    assert "Art. 293" in html
+    assert "Inciso" in html
