@@ -49,6 +49,32 @@ O dispatcher deve:
 
 O workflow `.github/workflows/deploy-backend.yml` executa os testes primeiro. Somente se os testes passarem ele chama o dispatcher. O dispatcher atualiza o clone do backend no Ubuntu e reinicia o serviço FastAPI.
 
+## API de Documentos Modelo
+
+Os modelos agora ficam fora do GitHub, no diretório de documentos do servidor. O FastAPI expõe:
+
+- `GET /files`: lista os arquivos em JSON;
+- `GET /files/<caminho>`: baixa um arquivo específico.
+
+Por padrão, o backend usa `/run/media/daniel/c1eb5cb7-675f-4e8c-9564-4dabc66d9164`. É possível sobrescrever esse diretório com a variável de ambiente `DOCUMENTOS_MODELO_DIR`.
+
+Para o GitHub Pages acessar essa API, o Funnel não deve mais servir uma pasta diretamente em `/files/`. Configure uma vez no servidor:
+
+```bash
+sudo tailscale funnel --https=443 --set-path=/files/ off
+sudo tailscale funnel --https=443 --set-path=/files http://127.0.0.1:8000/files --bg
+```
+
+Depois confirme com:
+
+```bash
+sudo tailscale funnel status
+curl http://127.0.0.1:8000/files
+curl https://servidor.tail7d4aa4.ts.net/files
+```
+
+A rota pública `/files` deve aparecer como `proxy http://127.0.0.1:8000/files`, e não mais como um `path` apontando diretamente para `/run/media/...`.
+
 ## Fluxo do GitHub Pages
 
 O workflow `.github/workflows/pages.yml` continua responsável pelo GitHub Pages. Ele também executa os testes e injeta `secrets.API_URL` no frontend durante o build.
