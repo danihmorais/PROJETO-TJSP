@@ -47,18 +47,15 @@ jobs:
           test -n "$API_URL" || { echo 'Secret API_URL não configurado.'; exit 1; }
           python - <<'PY'
           from pathlib import Path
-          import os
-          path = Path("docs/index.html")
-          text = path.read_text(encoding="utf-8")
-          marker = "const CONFIGURED_API_URL = "
-          value = repr(os.environ["API_URL"])
-          if marker in text:
-              start = text.index(marker)
-              end = text.index(";", start) + 1
-              text = text[:start] + marker + value + text[end:]
-          else:
-              text = text.replace("<script>", f"<script>\\nconst CONFIGURED_API_URL = {value};", 1)
-          path.write_text(text, encoding="utf-8")
+          import json, os
+          path = Path('docs/index.html')
+          text = path.read_text(encoding='utf-8')
+          marker = 'const CONFIGURED_API_URL='
+          value = json.dumps(os.environ['API_URL'])
+          start = text.index(marker)
+          end = text.index(';', start) + 1
+          text = text[:start] + marker + value + text[end:]
+          path.write_text(text, encoding='utf-8')
           PY
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
