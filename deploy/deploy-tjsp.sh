@@ -61,7 +61,8 @@ PYTHONPATH="$REPO" "$VENV/bin/python" -c "from app.main import app; print(app.ti
 /usr/bin/sudo -n /usr/bin/systemctl daemon-reload
 /usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
 
-for i in $(seq 1 10); do
+# Aguarda o serviço ficar ativo.
+for i in $(seq 1 15); do
     if /usr/bin/systemctl is-active --quiet "$SERVICE"; then
         break
     fi
@@ -69,8 +70,28 @@ for i in $(seq 1 10); do
 done
 /usr/bin/systemctl is-active --quiet "$SERVICE" || { echo "Serviço $SERVICE não iniciou."; exit 1; }
 
-# Valida a própria API do PROJETO-TJSP sem depender de recursos externos ao deploy.
-health_check=$(/usr/bin/curl --fail --silent --show-error --max-time 15 http://127.0.0.1:8000/health)
+# O systemd pode marcar o serviço como ativo antes de o Uvicorn estar pronto
+# para aceitar conexões. Aguarda o endpoint de health responder corretamente.
+health_check=""
+health_ok=0
+for i in $(seq 1 20); do
+    if health_check=$(/usr/bin/curl --fail --silent --show-error --max-time 3 http://127.0.0.1:8000/health 2>&1); then
+        health_ok=1
+        echo "GET /health respondeu na tentativa $i/20"
+        break
+    fi
+    echo "Aguardando /health ($i/20): ${health_check:-sem resposta}"
+    sleep 1
+done
+
+if [ "$health_ok" -ne 1 ]; then
+    echo "GET /health não respondeu após 20 tentativas."
+    /usr/bin/systemctl status "$SERVICE" --no-pager -l || true
+    /usr/bin/journalctl -u "$SERVICE" -n 40 --no-pager || true
+    set_status failure "GET /health não respondeu após 20 tentativas: ${health_check:-sem resposta}"
+    exit 1
+fi
+
 "$VENV/bin/python" - "$health_check" <<'PY'
 import json, sys
 payload = json.loads(sys.argv[1])
