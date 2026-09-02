@@ -11,9 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
-from .config import SOURCES, Source
-from .legislation import fetch_source
-from .render import CompilationEntry, render_html, render_markdown
+from app.config import SOURCES, Source
+from app.legislation import fetch_source
+from app.render import CompilationEntry, render_html, render_markdown
 
 app = FastAPI(title="PROJETO-TJSP — Compilador Legislativo", version="2.1.0")
 app.add_middleware(
@@ -139,7 +139,12 @@ async def root() -> str:
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "fontes_padrao": len(SOURCES), "persistencia": "localStorage no cliente"}
+    return {
+        "status": "ok",
+        "service": "danihmorais-github-pages",
+        "fontes_padrao": len(SOURCES),
+        "persistencia": "localStorage no cliente",
+    }
 
 
 @app.get("/api/defaults")
