@@ -86,3 +86,14 @@ def test_compile_rejects_duplicate_keys(client):
     }
     response = client.post("/api/compilar", json={"sources": [item, item], "format": "json"})
     assert response.status_code == 422
+
+
+def test_compile_rejects_all_sources_disabled(client):
+    source = SOURCES[0]
+    item = {
+        "key": source.key, "subject": source.subject, "title": source.title,
+        "url": source.url, "article_ranges": list(source.article_ranges), "enabled": False
+    }
+    response = client.post("/api/compilar", json={"sources": [item], "format": "json"})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Nenhuma legislação habilitada"
