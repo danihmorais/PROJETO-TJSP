@@ -2,34 +2,82 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from .config import SOURCES
 from .legislation import fetch_source
 from .render import CompilationEntry, render_html, render_markdown
 
-app = FastAPI(title="PROJETO-TJSP — Compilador Legislativo", version="1.1.0")
+app = FastAPI(title="PROJETO-TJSP — Compilador Legislativo", version="2.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^(https://danihmorais\.github\.io|https?://localhost(:\\d+)?|https?://127\.0\.0\.1(:\\d+)?)$",
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+ALLOWED_OFFICIAL_SUFFIXES = (".gov.br", ".leg.br", ".jus.br")
+
+
+class SourceInput(BaseModel):
+    key: str = Field(min_length=1, max_length=100)
+    subject: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=300)
+    url: HttpUrl
+    article_ranges: list[str] = Field(default_factory=list, max_length=100)
+    full_document: bool = False
+
+    @field_validator("url")
+    @classmethod
+    def official_https_url(cls, value: HttpUrl) -> HttpUrl:
+        parsed = urlparse(str(value))
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if parsed.scheme != "https":
+            raise ValueError("A fonte deve usar HTTPS")
+        if not host.endswith(ALLOWED_OFFICIAL_SUFFIXES):
+            raise ValueError("A fonte deve ser um domínio oficial .gov.br, .leg.br ou .jus.br")
+        return value
 
 
 class CompileRequest(BaseModel):
-    keys: list[str] | None = Field(default=None, description="Chaves das fontes a incluir")
-    format: str = Field(default="markdown", pattern="^(markdown|html|json)$")
+    sources: list[SourceInput] = Field(min_length=1, max_length=100)
+    format: str = Field(default="html", pattern="^(markdown|html|json)$")
 
 
-async def build_compilation(keys: list[str] | None = None) -> tuple[list[CompilationEntry], datetime]:
-    selected = [s for s in SOURCES if keys is None or s.key in keys]
-    if keys is not None:
-        known = {s.key for s in SOURCES}
-        unknown = sorted(set(keys) - known)
-        if unknown:
-            raise HTTPException(status_code=400, detail=f"Fontes desconhecidas: {', '.join(unknown)}")
+def source_to_dict(source) -> dict:
+    return {
+        "key": source.key,
+        "subject": source.subject,
+        "title": source.title,
+        "url": source.url,
+        "article_ranges": list(source.article_ranges),
+        "full_document": source.full_document,
+    }
 
-    fetched = await asyncio.gather(*(fetch_source(source) for source in selected), return_exceptions=True)
+
+def source_from_input(item: SourceInput):
+    from .config import Source
+
+    return Source(
+        item.key,
+        item.subject,
+        item.title,
+        str(item.url),
+        tuple(item.article_ranges),
+        item.full_document,
+    )
+
+
+async def build_compilation(sources) -> tuple[list[CompilationEntry], datetime]:
+    fetched = await asyncio.gather(*(fetch_source(source) for source in sources), return_exceptions=True)
     entries: list[CompilationEntry] = []
-    for source, result in zip(selected, fetched):
+    for source, result in zip(sources, fetched):
         if isinstance(result, Exception):
             entries.append(CompilationEntry(source, [], datetime.now(timezone.utc), str(result)))
         else:
@@ -38,39 +86,55 @@ async def build_compilation(keys: list[str] | None = None) -> tuple[list[Compila
     return entries, datetime.now(timezone.utc)
 
 
+def entries_json(entries, generated_at):
+    return {
+        "generated_at": generated_at.isoformat(),
+        "entries": [
+            {
+                "key": entry.source.key,
+                "materia": entry.source.subject,
+                "titulo": entry.source.title,
+                "fonte_oficial": entry.source.url,
+                "artigos": [device.number for device in entry.devices],
+                "erro": entry.error,
+            }
+            for entry in entries
+        ],
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
-async def index() -> str:
-    return """<!doctype html><html lang='pt-BR'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>PROJETO-TJSP</title><style>body{font-family:system-ui;max-width:900px;margin:50px auto;padding:0 22px;line-height:1.55}button,a{display:inline-block;padding:11px 16px;margin:4px 4px 4px 0;border:1px solid #bbb;border-radius:7px;text-decoration:none;color:inherit;background:#fff;cursor:pointer}.primary{background:#111;color:#fff}#status{margin-top:20px}.links{margin-top:20px}</style></head><body><h1>Compilado Legislativo — TJSP</h1><p>Gera, sob demanda, o recorte do edital a partir das fontes oficiais e remove notas editoriais de alteração.</p><button class='primary' onclick='gerar("html")'>Gerar compilado</button><button onclick='gerar("markdown")'>Markdown</button><div class='links'><a href='/fontes'>Ver fontes e recortes</a><a href='/docs'>API /docs</a></div><p id='status'></p><script>async function gerar(formato){status.textContent='Consultando as fontes oficiais...';const r=await fetch('/compilado?format='+formato);if(!r.ok){status.textContent='Erro ao gerar: '+await r.text();return}const t=await r.text();if(formato==='html'){document.open();document.write(t);document.close()}else{const w=window.open();w.document.write('<pre style="white-space:pre-wrap;font-family:system-ui;padding:30px">'+t.replaceAll('&','&amp;').replaceAll('<','&lt;')+'</pre>');w.document.close();}} </script></body></html>"""
-
-
-@app.get("/fontes")
-async def fontes():
-    return [
-        {"key": s.key, "materia": s.subject, "titulo": s.title, "fonte_oficial": s.url, "artigos": s.article_ranges, "documento_integral": s.full_document}
-        for s in SOURCES
-    ]
-
-
-@app.get("/compilado")
-async def compilado(format: str = Query("markdown", pattern="^(markdown|html|json)$")):
-    entries, generated_at = await build_compilation()
-    if format == "html":
-        return HTMLResponse(render_html(entries, generated_at))
-    if format == "json":
-        return {"generated_at": generated_at.isoformat(), "entries": [{"key": e.source.key, "materia": e.source.subject, "titulo": e.source.title, "fonte_oficial": e.source.url, "artigos": [d.number for d in e.devices], "erro": e.error} for e in entries]}
-    return PlainTextResponse(render_markdown(entries, generated_at), media_type="text/markdown; charset=utf-8")
-
-
-@app.post("/api/compilar")
-async def api_compilar(request: CompileRequest):
-    entries, generated_at = await build_compilation(request.keys)
-    if request.format == "html":
-        return HTMLResponse(render_html(entries, generated_at))
-    if request.format == "json":
-        return {"generated_at": generated_at.isoformat(), "entries": [{"key": e.source.key, "materia": e.source.subject, "titulo": e.source.title, "fonte_oficial": e.source.url, "artigos": [d.number for d in e.devices], "erro": e.error} for e in entries]}
-    return PlainTextResponse(render_markdown(entries, generated_at), media_type="text/markdown; charset=utf-8")
+async def root() -> str:
+    return "<html><body><h1>PROJETO-TJSP API</h1><p>Use a interface do GitHub Pages para configurar o compilado.</p><a href='/docs'>Documentação da API</a></body></html>"
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "fontes": len(SOURCES)}
+    return {"status": "ok", "fontes_padrao": len(SOURCES), "persistencia": "localStorage no cliente"}
+
+
+@app.get("/api/defaults")
+async def defaults():
+    return {"sources": [source_to_dict(source) for source in SOURCES]}
+
+
+@app.get("/fontes")
+async def fontes():
+    return [source_to_dict(source) for source in SOURCES]
+
+
+@app.post("/api/compilar")
+async def api_compilar(request: CompileRequest):
+    sources = [source_from_input(item) for item in request.sources]
+    entries, generated_at = await build_compilation(sources)
+    if request.format == "html":
+        return HTMLResponse(render_html(entries, generated_at))
+    if request.format == "json":
+        return entries_json(entries, generated_at)
+    return PlainTextResponse(render_markdown(entries, generated_at), media_type="text/markdown; charset=utf-8")
+
+
+@app.get("/compilado")
+async def compilado():
+    entries, generated_at = await build_compilation(SOURCES)
+    return HTMLResponse(render_html(entries, generated_at))
