@@ -296,17 +296,17 @@ const root=document.documentElement;
 const body=document.body;
 const search=document.getElementById('search');
 const noResults=document.getElementById('noResults');
-const articles=[...document.querySelectorAll('.article-card')];
 const laws=[...document.querySelectorAll('.law')];
 const subjects=[...document.querySelectorAll('.subject')];
 function updateSearch(){{
   const q=search.value.trim().toLowerCase();
   let visible=0;
   laws.forEach(law=>{{
-    const lawText=law.textContent.toLowerCase();
+    const lawHeader=law.querySelector('.law-header');
+    const lawMatches=Boolean(q&&lawHeader&&lawHeader.textContent.toLowerCase().includes(q));
     let lawVisible=false;
     law.querySelectorAll('.article-card').forEach(article=>{{
-      const ok=!q || lawText.includes(q) || article.dataset.search.includes(q);
+      const ok=!q || lawMatches || article.dataset.search.includes(q);
       article.classList.toggle('hidden',!ok);
       article.classList.toggle('match',Boolean(q&&ok));
       if(ok){{visible++;lawVisible=true;}}
