@@ -1,8 +1,15 @@
 # PROJETO-TJSP
 
-Compilador legislativo para estudos voltados ao TJSP. A aplicação usa **FastAPI** e consulta as versões oficiais das normas, extraindo somente os dispositivos previstos no programa e removendo notas editoriais de alteração, como `Redação dada pela Lei...`, `Incluído pela Lei...`, `Revogado pela Lei...` e links de referência inseridos no texto.
+Compilador legislativo para estudos voltados ao TJSP. A aplicação usa **FastAPI** como backend e uma interface estática publicada no **GitHub Pages**.
 
-## Escopo
+## Arquitetura
+
+- **GitHub Pages:** interface web estática em `docs/index.html`.
+- **FastAPI:** roda no servidor do usuário, acessível pelo endereço HTTPS do Tailscale.
+- **localStorage:** guarda no navegador a seleção, inclusão, alteração e exclusão de legislações. O backend não usa SQLite nem outro banco para essas preferências.
+- **Fontes oficiais:** o backend consulta a legislação diretamente no momento da geração.
+
+## Programa padrão
 
 - Direito Penal — Código Penal: arts. 293–305, 307, 308, 311-A, 312–317, 319–333, 336–337, 339–347, 357 e 359.
 - Direito Processual Penal — CPP: arts. 251–258, 261–267, 274, 351–372, 394–497, 531–538, 541–548 e 574–667; Lei 9.099/1995: arts. 60–83, 88 e 89.
@@ -10,39 +17,52 @@ Compilador legislativo para estudos voltados ao TJSP. A aplicação usa **FastAP
 - Direito Constitucional — CF: Título II, Capítulos I–III; Título III, Capítulo VII, Seções I–II; art. 92.
 - Direito Administrativo — Lei 10.261/1968: arts. 1º–86, 171–175 e 239–323; Lei 8.429/1992 integral.
 
-## Execução
+## Interface
+
+A página permite:
+
+- selecionar/desmarcar legislações;
+- adicionar uma nova legislação oficial;
+- alterar matéria, título, URL e recorte de artigos;
+- excluir uma legislação da configuração local;
+- pesquisar/filtrar a lista;
+- restaurar o programa padrão;
+- gerar HTML, Markdown ou JSON.
+
+As alterações ficam no `localStorage` do navegador e permanecem após recarregar a página no mesmo navegador.
+
+## Backend
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Acesse `http://127.0.0.1:8000/`.
+Endpoints principais:
 
-### API
+- `GET /health` — status do backend.
+- `GET /api/defaults` — programa padrão.
+- `GET /fontes` — fontes padrão.
+- `POST /api/compilar` — recebe a configuração atual do navegador e gera o material.
+- `GET /docs` — documentação interativa do FastAPI.
 
-- `GET /health` — status.
-- `GET /fontes` — fontes oficiais e recortes configurados.
-- `GET /compilado?format=html` — compilado HTML, pronto para imprimir/salvar como PDF pelo navegador.
-- `GET /compilado?format=markdown` — compilado em Markdown.
-- `GET /compilado?format=json` — metadados e artigos efetivamente extraídos.
-- `POST /api/compilar` — permite selecionar fontes e formato, por exemplo `{"keys":["cp","cpp"],"format":"html"}`.
+O backend não mantém a configuração do usuário. Cada compilação recebe explicitamente as fontes selecionadas pela interface.
 
-A documentação interativa fica em `/docs`.
+## GitHub Pages
 
-## Limpeza e segurança editorial
+O workflow `.github/workflows/pages.yml` publica automaticamente o conteúdo de `docs/` no GitHub Pages a cada atualização da `main`.
 
-O parser remove elementos HTML riscados (`del`, `s`, `strike`) e notas editoriais reconhecíveis. Referências internas como `conforme o art. 294` são preservadas porque somente marcadores de artigo no início de uma linha iniciam um novo dispositivo.
+## Limpeza editorial
 
-O projeto **não grava uma cópia permanente da legislação no GitHub**: o texto é buscado no momento da geração. Isso reduz o risco de estudar uma versão antiga por engano.
+O parser remove elementos HTML riscados (`del`, `s`, `strike`) e notas editoriais reconhecíveis, preservando o texto normativo. O projeto não mantém uma cópia permanente da legislação no repositório; o texto é consultado nas fontes oficiais no momento da geração.
 
 ## Princípios
 
-1. **Fonte oficial primeiro:** não usar agregadores jurídicos como fonte do texto normativo.
-2. **Rastreabilidade:** cada norma mantém a URL oficial e o horário da consulta.
-3. **Recorte programático:** artigos fora do edital não entram no compilado, salvo normas marcadas como integrais.
-4. **Limpeza editorial:** remove links e expressões de histórico legislativo sem alterar o texto dispositivo deliberadamente.
-5. **Atualização sob demanda:** o conteúdo é consultado novamente a cada geração, evitando manter legislação desatualizada no repositório.
-6. **Prevalência da fonte oficial:** o compilado é ferramenta de estudo e não substitui a publicação oficial.
+1. Fonte oficial primeiro.
+2. Configuração do usuário no navegador, sem banco de dados.
+3. Atualização do texto sob demanda.
+4. Recorte programático dos artigos selecionados.
+5. Remoção de ruído editorial sem substituir o texto normativo.
+6. A publicação oficial da norma prevalece em caso de divergência.
