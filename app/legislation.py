@@ -9,20 +9,48 @@ from bs4 import BeautifulSoup
 
 from .config import Source
 
-# Notas editoriais que acompanham o texto oficial, mas não integram o dispositivo
-# vigente que interessa ao estudo. O texto substantivo da norma é preservado.
+# Texto editorial encontrado nas páginas de legislação, mas que não integra
+# a redação substantiva do dispositivo.
 EDITORIAL_LINK_RE = re.compile(
-    r"\[\s*\(?\s*(?:Redação dada|Incluído|Incluída|Revogado|Revogada|Alterado|Alterada|Renumerado|Renumerada|Transformado|Transformada|Vide)\b.*?\)?\s*\]\([^)]*\)",
+    r"\[\s*\(?\s*(?:Redação dada|Incluído|Incluída|Revogado|Revogada|Alterado|Alterada|"
+    r"Renumerado|Renumerada|Transformado|Transformada|Vide)\b.*?\)?\s*\]\([^)]*\)",
     re.IGNORECASE,
 )
 EDITORIAL_NOTE_RE = re.compile(
-    r"\s*\(\s*(?:Redação dada|Incluído|Incluída|Revogado|Revogada|Alterado|Alterada|Renumerado|Renumerada|Transformado|Transformada)\b[^()\n]*\)",
+    r"\s*\(\s*(?:Redação dada|Incluído|Incluída|Revogado|Revogada|Alterado|Alterada|"
+    r"Renumerado|Renumerada|Transformado|Transformada)\b[^()\n]*\)",
     re.IGNORECASE,
 )
 EDITORIAL_VIDE_RE = re.compile(r"\s*\(\s*Vide\b[^()\n]*\)", re.IGNORECASE)
-EDITORIAL_STATUS_RE = re.compile(r"\s*\(\s*(?:Vigência|Produção de efeitos)\s*\)", re.IGNORECASE)
+EDITORIAL_STATUS_RE = re.compile(r"\s*\(\s*(?:Vigência|Produção de efeitos|NR)\s*\)", re.IGNORECASE)
+
+# Anotações da AL-SP frequentemente aparecem depois de um hífen, por exemplo:
+# "Artigo 319 ... (NR) - Artigo 319 com redação dada ...".
+EDITORIAL_TAIL_RE = re.compile(
+    r"\s*(?:[-–—]\s*)?(?:\(?NR\)?\s*[-–—]\s*)?"
+    r"(?:Artigo|Art\.?)[ \t]*\d+(?:-[A-Za-z]+)?[º°]?[ \t]+"
+    r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
+    r"alterado|alterada|transformado|transformada)\b.*$",
+    re.IGNORECASE,
+)
+EDITORIAL_PARAGRAPH_TAIL_RE = re.compile(
+    r"\s*(?:[-–—]\s*)?(?:Parágrafo\s+único|§\s*\d+[º°]?)[ \t]+"
+    r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
+    r"alterado|alterada|transformado|transformada)\b.*$",
+    re.IGNORECASE,
+)
+EDITORIAL_BLOCK_RE = re.compile(
+    r"^(?:[-–—]\s*)?(?:\(?NR\)?|(?:Artigo|Art\.?)[ \t]*\d+(?:-[A-Za-z]+)?[º°]?[ \t]+"
+    r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
+    r"alterado|alterada|transformado|transformada)|(?:Parágrafo\s+único|§\s*\d+[º°]?)"
+    r"[ \t]+(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
+    r"alterado|alterada|transformado|transformada))\b.*$",
+    re.IGNORECASE,
+)
+
 ARTICLE_RE = re.compile(
-    r"(?mi)^[ \t]*(?:Art\.|Artigo)\s*(\d+(?:-[A-Za-z])?)[º°]?\s*(?:[—–-]\s*)?"
+    r"(?mi)^[ \t]*(?:Art\.?|Artigo)\s*(\d+(?:-[A-Za-z]+)?)[º°]?"
+    r"\s*(?:[—–-]\s*)?"
 )
 
 
@@ -32,20 +60,31 @@ class Device:
     text: str
 
 
+def _strip_editorial_tails(text: str) -> str:
+    previous = None
+    while previous != text:
+        previous = text
+        text = EDITORIAL_TAIL_RE.sub("", text)
+        text = EDITORIAL_PARAGRAPH_TAIL_RE.sub("", text)
+    return text
+
+
 def clean_text(text: str) -> str:
-    """Remove apenas ruído editorial, preservando a redação normativa."""
+    """Remove ruído editorial sem reescrever a redação normativa."""
     text = EDITORIAL_LINK_RE.sub("", text)
     text = EDITORIAL_NOTE_RE.sub("", text)
     text = EDITORIAL_VIDE_RE.sub("", text)
     text = EDITORIAL_STATUS_RE.sub("", text)
+    text = _strip_editorial_tails(text)
     text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
     text = re.sub(r"https?://\S+", "", text)
 
     cleaned_lines: list[str] = []
-    for line in text.splitlines():
-        line = re.sub(r"[ \t]+", " ", line).strip()
-        if line:
-            cleaned_lines.append(line)
+    for raw_line in text.splitlines():
+        line = re.sub(r"[ \t]+", " ", raw_line).strip()
+        if not line or EDITORIAL_BLOCK_RE.match(line):
+            continue
+        cleaned_lines.append(line)
     return "\n".join(cleaned_lines).strip()
 
 
@@ -55,7 +94,7 @@ def normalize_article_number(raw: str) -> str:
 
 def _article_id(value: str) -> tuple[int, str]:
     normalized = normalize_article_number(value)
-    match = re.fullmatch(r"(\d+)(?:-([a-z]))?", normalized)
+    match = re.fullmatch(r"(\d+)(?:-([a-z]+))?", normalized)
     if not match:
         raise ValueError(f"Número de artigo inválido: {value!r}")
     return int(match.group(1)), (match.group(2) or "")
@@ -72,7 +111,7 @@ def article_in_ranges(number: str, ranges: tuple[str, ...]) -> bool:
         if _is_range_spec(spec):
             start, _ = _article_id(spec.split("-", 1)[0])
             end, _ = _article_id(spec.split("-", 1)[1])
-            if start <= current_num <= end:
+            if start <= current_num <= end and not current_suffix:
                 return True
         else:
             target_num, target_suffix = _article_id(spec)
@@ -97,14 +136,15 @@ def extract_articles(html: str, source: Source) -> list[Device]:
     seen: set[str] = set()
     for index, match in enumerate(matches):
         number = match.group(1)
+        normalized = normalize_article_number(number)
         if source.article_ranges and not article_in_ranges(number, source.article_ranges):
             continue
 
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
         body = clean_text(text[match.start():end])
-        if not body or number.lower() in seen:
+        if not body or normalized in seen:
             continue
-        seen.add(number.lower())
+        seen.add(normalized)
         results.append(Device(number=number, text=body))
 
     return results
