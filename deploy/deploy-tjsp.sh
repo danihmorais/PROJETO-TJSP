@@ -30,7 +30,7 @@ PY
 }
 
 exec >> "$LOG" 2>&1
-trap 'echo "$(date) - DEPLOY TJSP FALHOU"; set_status failure "Deploy falhou. Consulte deploy-tjsp.log."' ERR
+trap 'rc=$?; msg="Deploy falhou na etapa: $BASH_COMMAND"; echo "$(date) - $msg"; set_status failure "$msg"; exit "$rc"' ERR
 
 echo ""
 echo "=========================================="
@@ -58,12 +58,9 @@ install -m 0644 "$REPO/deploy/deploy_server.py" "$INSTALL_ROOT/deploy_server.py"
 "$VENV/bin/python" -m pip check
 PYTHONPATH="$REPO" "$VENV/bin/python" -c "from app.main import app; print(app.title); assert any(route.path == '/files' for route in app.routes)"
 
-# O python-api.service deve ser configurado uma vez no servidor para executar:
-#   WorkingDirectory=/home/daniel/Downloads/PROJETO-TJSP
-#   Environment=PYTHONPATH=/home/daniel/Downloads/PROJETO-TJSP
-#   Environment=DOCUMENTOS_MODELO_DIR=/run/media/daniel/c1eb5cb7-675f-4e8c-9564-4dabc66d9164
-#   ExecStart=/home/daniel/python/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
-# O deploy apenas reinicia e valida o serviço; não tenta editar systemd em modo não-interativo.
+# O python-api.service deve ser configurado uma única vez no servidor.
+# Veja deploy/configure-python-api-service.sh. O deploy não usa systemctl edit
+# porque essa operação exige um TTY e não é apropriada para automação.
 
 /usr/bin/sudo -n /usr/bin/systemctl daemon-reload
 /usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
@@ -76,8 +73,7 @@ for i in $(seq 1 10); do
 done
 /usr/bin/systemctl is-active --quiet "$SERVICE" || { echo "Serviço $SERVICE não iniciou."; exit 1; }
 
-# Não considera o deploy concluído apenas porque o systemd está active:
-# valida a rota que o frontend realmente usa.
+# Valida exatamente o endpoint consumido pelo GitHub Pages.
 api_check=$(/usr/bin/curl --fail --silent --show-error --max-time 15 http://127.0.0.1:8000/files)
 "$VENV/bin/python" - "$api_check" <<'PY'
 import json, sys
