@@ -16,10 +16,7 @@ SOURCES = (
     Source("cpc", "Direito Processual Civil", "Código de Processo Civil", "https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13105.htm", ("144-155", "188-275", "294-311", "318-538", "994-1026")),
     Source("lei9099-processual-civil", "Direito Processual Civil", "Lei nº 9.099/1995", "https://www.planalto.gov.br/ccivil_03/leis/l9099.htm", ("3-19",)),
     Source("lei12153", "Direito Processual Civil", "Lei nº 12.153/2009", "https://www.planalto.gov.br/ccivil_03/_ato2007-2010/2009/lei/l12153.htm", (), True),
-    Source("cf", "Direito Constitucional", "Constituição da República Federativa do Brasil", "https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm", (), True),
+    Source("cf", "Direito Constitucional", "Constituição da República Federativa do Brasil", "https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm", ("5-17", "18-43", "44-56", "70-85", "92")),
     Source("lei10261", "Direito Administrativo", "Lei nº 10.261/1968 — Estatuto dos Funcionários Públicos Civis do Estado de São Paulo", "https://www.al.sp.gov.br/repositorio/legislacao/lei/1968/lei-10261-28.10.1968.html", ("1-86", "171-175", "239-323")),
     Source("lei8429", "Direito Administrativo", "Lei nº 8.429/1992 — Lei de Improbidade Administrativa", "https://www.planalto.gov.br/ccivil_03/leis/l8429.htm", (), True),
 )
-
-# A CF é recortada por títulos/capítulos, não por numeração contínua.
-CF_TARGET = {"titulo_ii_cap_i", "titulo_ii_cap_ii", "titulo_ii_cap_iii", "titulo_iii_cap_vii_sec_i", "titulo_iii_cap_vii_sec_ii", "art_92"}
