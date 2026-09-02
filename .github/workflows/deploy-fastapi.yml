@@ -21,7 +21,7 @@ jobs:
       - name: Trigger Ubuntu deployment
         env:
           WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
-          DEPLOY_URL: ${{ secrets.API_URL }}/deploy
+          API_URL: ${{ secrets.API_URL }}
           SHA: ${{ github.sha }}
           REPOSITORY: ${{ github.repository }}
           PROJECT: PROJETO-TJSP
@@ -29,7 +29,9 @@ jobs:
           set -euo pipefail
 
           test -n "$WEBHOOK_SECRET" || { echo 'Secret DEPLOY_WEBHOOK_SECRET não configurado.'; exit 1; }
-          test -n "$DEPLOY_URL" || { echo 'Secret API_URL não configurado.'; exit 1; }
+          test -n "$API_URL" || { echo 'Secret API_URL não configurado.'; exit 1; }
+
+          DEPLOY_URL="${API_URL%/}/deploy"
 
           body=$(jq -nc \
             --arg ref 'refs/heads/main' \
@@ -53,13 +55,15 @@ jobs:
 
       - name: Wait for deployment
         env:
-          STATUS_URL: ${{ secrets.API_URL }}/deploy-status
+          API_URL: ${{ secrets.API_URL }}
           SHA: ${{ github.sha }}
           PROJECT: PROJETO-TJSP
         run: |
           set -euo pipefail
 
-          test -n "$STATUS_URL" || { echo 'Secret API_URL não configurado.'; exit 1; }
+          test -n "$API_URL" || { echo 'Secret API_URL não configurado.'; exit 1; }
+
+          STATUS_URL="${API_URL%/}/deploy-status"
 
           for i in $(seq 1 60); do
             response=$(curl --fail --silent --show-error \
