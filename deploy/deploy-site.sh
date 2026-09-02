@@ -33,8 +33,10 @@ echo "Commit: $SHA"
 echo "Serviço: $SERVICE"
 echo "=========================================="
 
+# O serviço FastAPI é compartilhado pelos dois repositórios.
+# O lock é bloqueante: deploys concorrentes são serializados em vez de falharem.
 exec 200>"$LOCK"
-flock -n 200 || { set_status failure "Outro deploy que usa o serviço FastAPI já está em execução."; exit 1; }
+flock 200
 
 cd "$REPO"
 git fetch origin
@@ -55,7 +57,7 @@ if ! import_output=$("$VENV/bin/python" -c "import main; print('IMPORT MAIN OK')
 fi
 echo "$import_output"
 
-# Não altera a unidade systemd durante o deploy.
+# O entrypoint já existente do serviço é compatível com o agregador.
 /usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
 
 for i in $(seq 1 20); do
