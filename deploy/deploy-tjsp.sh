@@ -5,6 +5,7 @@ REPO="${PROJETO_TJSP_REPO:-/home/daniel/Downloads/PROJETO-TJSP}"
 VENV="${PROJETO_TJSP_VENV:-/home/daniel/python/.venv}"
 LOG="${PROJETO_TJSP_LOG:-/home/daniel/python/deploy-tjsp.log}"
 STATUS_DIR="${DEPLOY_STATUS_DIR:-/home/daniel/python/deploy-status/PROJETO-TJSP}"
+INSTALL_ROOT="${DEPLOY_INSTALL_ROOT:-/home/daniel/python}"
 LOCK="/tmp/projeto-tjsp-deploy.lock"
 SHA="${1:-}"
 
@@ -45,15 +46,22 @@ git fetch origin
 git cat-file -e "$SHA^{commit}" 2>/dev/null || { set_status failure "Commit não encontrado."; exit 1; }
 
 git checkout --force "$SHA"
-
 git rev-parse HEAD
+
+# Mantém os scripts usados pelo dispatcher sincronizados com o repositório.
+# O deploy atual pode substituir o próprio script com segurança usando um arquivo temporário.
+install -m 0755 "$REPO/deploy/deploy-tjsp.sh" "$INSTALL_ROOT/deploy-tjsp.sh.new"
+mv -f "$INSTALL_ROOT/deploy-tjsp.sh.new" "$INSTALL_ROOT/deploy-tjsp.sh"
+install -m 0755 "$REPO/deploy/deploy-site.sh" "$INSTALL_ROOT/deploy-site.sh"
+install -m 0644 "$REPO/deploy/deploy_server.py" "$INSTALL_ROOT/deploy_server.py"
 
 "$VENV/bin/python" -m pip install -r "$REPO/requirements.txt"
 "$VENV/bin/python" -m pip check
 PYTHONPATH="$REPO" "$VENV/bin/python" -c "from app.main import app; print(app.title)"
 
-# O agregador FastAPI é reiniciado para carregar a nova versão do TJSP.
-sudo systemctl restart fastapi
+# O agregador FastAPI é um serviço do sistema. O deploy precisa conseguir
+# reiniciá-lo sem prompt de senha/TTY, pois é executado em segundo plano.
+/usr/bin/sudo -n /usr/bin/systemctl restart fastapi
 sleep 3
 systemctl is-active --quiet fastapi || { echo "FastAPI não iniciou."; exit 1; }
 
