@@ -6,6 +6,7 @@ VENV="${DANIHMORAIS_GITHUB_PAGES_VENV:-/home/daniel/python/.venv}"
 LOG="${DANIHMORAIS_GITHUB_PAGES_LOG:-/home/daniel/python/deploy.log}"
 STATUS_DIR="${DEPLOY_STATUS_DIR:-/home/daniel/python/deploy-status}/DANIHMORAIS-GITHUB-PAGES"
 SERVICE="${DANIHMORAIS_GITHUB_PAGES_SERVICE:-python-api.service}"
+SERVICE_USER="${DANIHMORAIS_GITHUB_PAGES_USER:-daniel}"
 LOCK="/tmp/python-api-deploy.lock"
 SHA="${1:-}"
 
@@ -48,31 +49,18 @@ git rev-parse HEAD
 "$VENV/bin/python" -m pip check
 "$VENV/bin/python" -c "import main; print('IMPORT MAIN OK')"
 
-# Este serviço é compartilhado pelos dois repositórios. A fonte de execução
-# deve ser sempre o agregador FastAPI deste repositório, que monta também
-# o aplicativo PROJETO-TJSP em /estudos.
-UNIT_FILE="$(mktemp)"
-trap 'rm -f "$UNIT_FILE"' EXIT
-cat > "$UNIT_FILE" <<EOF
-[Unit]
-Description=Universo da Licitação - API agregadora
-After=network-online.target
-Wants=network-online.target
+# O serviço compartilhado deve executar o agregador deste repositório.
+# Usa systemctl edit para persistir o override sem depender de gravação direta
+# em /etc/systemd/system pelo shell do deploy.
+/usr/bin/printf '%s\n' \
+    '[Service]' \
+    "User=$SERVICE_USER" \
+    "WorkingDirectory=$REPO" \
+    "Environment=PYTHONPATH=$REPO" \
+    'ExecStart=' \
+    "ExecStart=$VENV/bin/uvicorn main:app --host 0.0.0.0 --port 8000" \
+    | /usr/bin/sudo -n /usr/bin/systemctl edit --stdin "$SERVICE"
 
-[Service]
-Type=simple
-User=$(id -un)
-WorkingDirectory=$REPO
-Environment=PYTHONPATH=$REPO
-ExecStart=$VENV/bin/uvicorn main:app --host 0.0.0.0 --port 8000
-Restart=always
-RestartSec=2
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-/usr/bin/sudo -n /usr/bin/install -m 0644 "$UNIT_FILE" "/etc/systemd/system/$SERVICE"
 /usr/bin/sudo -n /usr/bin/systemctl daemon-reload
 /usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
 
