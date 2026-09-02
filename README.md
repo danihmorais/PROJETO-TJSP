@@ -22,9 +22,26 @@ O mesmo programa está disponível no frontend em `docs/defaults.js`, para que a
 
 ## Interface
 
-A página permite selecionar/desmarcar legislações, adicionar normas, editar matéria/título/fonte/recorte, excluir itens, pesquisar e restaurar o programa padrão. As alterações ficam somente no `localStorage` do navegador.
+A tela foi organizada como uma pequena biblioteca de estudo: pesquisa por nome, matéria ou recorte; filtro por matéria; seleção em massa; edição e exclusão; inclusão de novas legislações; e restauração do programa padrão. As alterações continuam somente no `localStorage` do navegador.
 
-O endereço e a infraestrutura do backend não são exibidos ao usuário. O `API_URL` é injetado pelo GitHub Actions durante a publicação a partir do secret `API_URL`.
+A interface não exibe a infraestrutura do backend. O `API_URL` é injetado pelo GitHub Actions durante a publicação a partir do secret `API_URL`. O frontend aceita tanto uma URL-base do servidor quanto uma URL que já contenha `/estudos`.
+
+## Geração do material
+
+A geração HTML foi redesenhada para privilegiar a **lei seca** e, ao mesmo tempo, reduzir a sensação de texto corrido. O material gerado possui:
+
+- índice lateral por matéria, legislação e artigo;
+- busca instantânea no texto consultado;
+- navegação direta para cada artigo e cópia do link do dispositivo;
+- separação visual do **caput**, parágrafos, incisos e alíneas quando identificáveis;
+- modo de leitura compacta para revisão;
+- modo foco, tema escuro e suporte à impressão;
+- fonte oficial e data da consulta destacadas;
+- contador de artigos efetivamente localizados.
+
+A expressão “condensado” aqui significa **condensação visual e estrutural**, não um resumo jurídico automático: o texto normativo não é reescrito para produzir uma falsa síntese. A organização procura tornar mais rápida a revisão da redação legal original.
+
+O Markdown também utiliza a mesma estrutura de dispositivo, com os marcadores de parágrafos e incisos destacados. O JSON continua disponível para uso programático.
 
 ## Backend
 
@@ -51,19 +68,10 @@ O backend não mantém a configuração do usuário. Cada compilação recebe ex
 
 ## GitHub Actions
 
-Existe um único workflow em `.github/workflows/ci-cd.yml`.
+O repositório possui workflows separados para publicação estática e deploy do backend.
 
-Em pull requests, ele executa os testes e as validações estáticas.
-
-Em pushes para `main` e em execuções manuais, após os testes passarem, ele:
-
-1. chama o webhook compartilhado `/deploy` usando `API_URL` e `DEPLOY_WEBHOOK_SECRET`;
-2. informa ao dispatcher que o projeto é `PROJETO-TJSP`;
-3. aguarda `/deploy-status` até o backend estar atualizado;
-4. injeta `API_URL` no frontend durante o build;
-5. publica `docs/` no GitHub Pages.
-
-O mesmo endpoint de deploy atende também o repositório `danihmorais/danihmorais.github.io`; o dispatcher diferencia os projetos pelo repositório informado no payload.
+- `.github/workflows/static.yml` valida os arquivos estáticos, injeta `API_URL` e publica `docs/` no GitHub Pages.
+- `.github/workflows/deploy-fastapi.yml` aciona o webhook compartilhado de deploy usando `API_URL` e `DEPLOY_WEBHOOK_SECRET`, identifica o projeto como `PROJETO-TJSP` e aguarda o endpoint `/deploy-status`.
 
 ## Limpeza editorial
 
@@ -75,5 +83,6 @@ O parser remove elementos HTML riscados (`del`, `s`, `strike`) e notas editoriai
 2. Configuração do usuário no navegador, sem banco de dados.
 3. Atualização do texto sob demanda.
 4. Recorte programático dos artigos selecionados.
-5. Remoção de ruído editorial sem substituir o texto normativo.
-6. A publicação oficial da norma prevalece em caso de divergência.
+5. Organização visual sem substituir a redação normativa.
+6. Remoção de ruído editorial sem reescrever o dispositivo.
+7. A publicação oficial da norma prevalece em caso de divergência.
