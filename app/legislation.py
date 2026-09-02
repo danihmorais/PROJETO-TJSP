@@ -33,25 +33,25 @@ EDITORIAL_TAIL_PATTERNS = (
         r"(?:Artigo|Art\.?)[ \t]*\d+(?:-[A-Za-z]+)?[º°]?[ \t]+"
         r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
         r"alterado|alterada|transformado|transformada)\b.*$",
-        re.IGNORECASE,
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
         r"\s*(?:[-–—]\s*)?(?:[\"“”']?Caput[\"“”']?)[ \t]+"
         r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
         r"alterado|alterada|transformado|transformada)\b.*$",
-        re.IGNORECASE,
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
         r"\s*[-–—][ \t]*(?:acrescentado|acrescentada|incluído|incluída|revogado|revogada|"
         r"alterado|alterada|renumerado|renumerada|transformado|transformada|"
         r"suprimido|suprimida)\b.*$",
-        re.IGNORECASE,
+        re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(
         r"\s*(?:[-–—]\s*)?(?:Parágrafo\s+único|§\s*\d+[º°]?)[ \t]+"
         r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
         r"alterado|alterada|transformado|transformada)\b.*$",
-        re.IGNORECASE,
+        re.IGNORECASE | re.MULTILINE,
     ),
 )
 EDITORIAL_BLOCK_RE = re.compile(
