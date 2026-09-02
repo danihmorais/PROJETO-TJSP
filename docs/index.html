@@ -1,87 +1,36 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PROJETO-TJSP — Compilador Legislativo</title>
 <style>
-:root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f5f7fb}
-*{box-sizing:border-box}body{margin:0}.wrap{max-width:1180px;margin:auto;padding:28px 20px 60px}header{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:24px}h1{margin:0;font-size:30px}h2{font-size:19px;margin:0 0 14px}.muted{color:#647084}.card{background:white;border:1px solid #dfe4ec;border-radius:12px;padding:18px;margin-bottom:18px;box-shadow:0 2px 8px #00000008}.toolbar{display:grid;grid-template-columns:1fr 220px;gap:12px}.row{display:grid;grid-template-columns:180px 1fr 1fr auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid #edf0f5}.row:last-child{border-bottom:0}input,select,button{font:inherit;border:1px solid #cbd2dc;border-radius:8px;padding:9px;background:#fff}button{cursor:pointer}button.primary{background:#172033;color:#fff;border-color:#172033}.actions{display:flex;gap:8px;flex-wrap:wrap}.subject{font-weight:700;margin-top:16px}.range{font-family:ui-monospace,monospace}.status{margin-top:12px;min-height:24px}.danger{color:#a61b1b}.ok{color:#137333}.empty{text-align:center;padding:28px}.small{font-size:13px}.source-url{max-width:430px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:800px){.toolbar,.row{grid-template-columns:1fr}.source-url{max-width:none}}
-</style>
-</head>
-<body>
-<div class="wrap">
-<header><div><h1>Compilador Legislativo — TJSP</h1><div class="muted">GitHub Pages + FastAPI no servidor Tailscale</div></div><div class="small muted">As configurações ficam somente neste navegador.</div></header>
-
-<section class="card">
-<h2>Backend</h2>
-<div class="toolbar"><input id="backend" placeholder="https://seu-servidor.tailnet.ts.net" autocomplete="url"><button onclick="testBackend()">Testar conexão</button></div>
-<div id="backendStatus" class="status muted"></div>
-</section>
-
-<section class="card">
-<h2>Fontes selecionadas</h2>
-<div class="toolbar"><input id="filter" placeholder="Filtrar por matéria, legislação ou artigo..." oninput="render()"><button onclick="addSource()">+ Adicionar legislação</button></div>
-<div class="actions" style="margin-top:12px"><button onclick="selectAll()">Selecionar todas</button><button onclick="selectNone()">Desmarcar todas</button><button onclick="resetDefaults()">Restaurar padrão</button></div>
-<div id="sources"></div>
-<div id="status" class="status"></div>
-</section>
-
-<section class="card">
-<h2>Gerar compilado</h2>
-<div class="actions"><button class="primary" onclick="compile('html')">Gerar HTML</button><button onclick="compile('markdown')">Gerar Markdown</button><button onclick="compile('json')">Gerar JSON</button></div>
-<p class="muted small">O backend consulta as fontes oficiais no momento da geração. O texto legislativo não é armazenado no GitHub Pages.</p>
-</section>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#172033;background:#f5f7fb}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1200px;margin:auto;padding:28px 20px 60px}header{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:24px}h1{margin:0;font-size:30px}h2{font-size:19px;margin:0 0 14px}.muted{color:#647084}.card{background:#fff;border:1px solid #dfe4ec;border-radius:12px;padding:18px;margin-bottom:18px;box-shadow:0 2px 8px #00000008}.toolbar{display:grid;grid-template-columns:1fr auto;gap:10px}input,button{font:inherit;border:1px solid #cbd2dc;border-radius:8px;padding:10px;background:#fff}button{cursor:pointer}.primary{background:#172033;color:#fff}.actions{display:flex;gap:8px;flex-wrap:wrap}.row{display:grid;grid-template-columns:28px 1.2fr 1fr 1fr auto;gap:10px;align-items:center;padding:13px 0;border-bottom:1px solid #edf0f5}.row:last-child{border:0}.range{font-family:ui-monospace,monospace;font-size:13px}.small{font-size:13px}.url{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.status{min-height:24px;margin-top:12px}.ok{color:#137333}.danger{color:#a61b1b}.empty{text-align:center;padding:28px}.modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:20px}.dialog{background:#fff;border-radius:14px;padding:22px;max-width:650px;width:100%}.form{display:grid;gap:10px}.form label{display:grid;gap:5px;font-size:13px;font-weight:600}.form input{width:100%}@media(max-width:850px){header{display:block}.row{grid-template-columns:28px 1fr}.url{grid-column:2}.row .actions{grid-column:2}}
+</style></head>
+<body><div class="wrap">
+<header><div><h1>Compilador Legislativo — TJSP</h1><div class="muted">GitHub Pages + FastAPI no servidor Tailscale</div></div><div class="small muted">Configuração salva somente neste navegador.</div></header>
+<section class="card"><h2>Backend</h2><div class="toolbar"><input id="backend" placeholder="API_URL configurada pelo GitHub Actions"><button onclick="testBackend()">Testar conexão</button></div><div id="backendStatus" class="status muted"></div></section>
+<section class="card"><h2>Legislações</h2><div class="toolbar"><input id="filter" placeholder="Pesquisar matéria, legislação ou artigo..." oninput="render()"><button onclick="openEditor()">+ Adicionar</button></div><div class="actions" style="margin-top:12px"><button onclick="selectAll()">Selecionar todas</button><button onclick="selectNone()">Desmarcar todas</button><button onclick="resetDefaults()">Restaurar padrão</button></div><div id="sources"></div><div id="status" class="status"></div></section>
+<section class="card"><h2>Compilar</h2><div class="actions"><button class="primary" onclick="compile('html')">Gerar HTML</button><button onclick="compile('markdown')">Gerar Markdown</button><button onclick="compile('json')">Gerar JSON</button></div><p class="muted small">A legislação é consultada diretamente nas fontes oficiais no momento da geração.</p></section>
 </div>
+<div id="modal" class="modal"><div class="dialog"><h2 id="modalTitle">Adicionar legislação</h2><form class="form" onsubmit="saveEditor(event)"><label>Nome<input id="fTitle" required></label><label>Matéria<input id="fSubject" required></label><label>URL oficial HTTPS<input id="fUrl" type="url" placeholder="https://...gov.br/..." required></label><label>Artigos<input id="fRanges" placeholder="1-10, 25, 31-A; vazio = documento integral"></label><div class="actions"><button type="button" onclick="closeEditor()">Cancelar</button><button class="primary" type="submit">Salvar</button></div></form></div></div>
 <script>
-const STORAGE_KEY='projeto-tjsp-config-v2';
-let defaults=[];
-let sources=[];
-
-function clone(v){return JSON.parse(JSON.stringify(v))}
+const CONFIGURED_API_URL=__API_URL__;
+const STORAGE_KEY='projeto-tjsp-config-v3';
+let defaults=[],sources=[],editingKey=null;
+const clone=v=>JSON.parse(JSON.stringify(v));
+const backend=()=>String(document.getElementById('backend').value||'').trim().replace(/\/$/,'');
 function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(sources))}
-function load(){const raw=localStorage.getItem(STORAGE_KEY);sources=raw?JSON.parse(raw):clone(defaults);sources.forEach(s=>{if(s.enabled===undefined)s.enabled=true})}
-function render(){
- const q=document.getElementById('filter').value.trim().toLowerCase();
- const box=document.getElementById('sources');
- const visible=sources.filter(s=>(s.subject+' '+s.title+' '+s.key+' '+s.article_ranges.join(' ')).toLowerCase().includes(q));
- if(!visible.length){box.innerHTML='<div class="empty muted">Nenhuma legislação encontrada.</div>';return}
- box.innerHTML=visible.map(s=>`<div class="row">
- <label><input type="checkbox" ${s.enabled?'checked':''} onchange="toggle('${esc(s.key)}',this.checked)"> <b>${esc(s.title)}</b></label>
- <div><div class="small muted">${esc(s.subject)}</div><div class="range">${s.full_document?'Documento integral':esc(s.article_ranges.join(', '))}</div></div>
- <div class="source-url small" title="${esc(s.url)}">${esc(s.url)}</div>
- <div class="actions"><button onclick="editSource('${esc(s.key)}')">Editar</button><button onclick="removeSource('${esc(s.key)}')">Excluir</button></div>
- </div>`).join('');
-}
+function load(){try{const raw=localStorage.getItem(STORAGE_KEY);sources=raw?JSON.parse(raw):clone(defaults)}catch{sources=clone(defaults)}sources.forEach(s=>s.enabled=s.enabled!==false)}
 function esc(v){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function find(key){return sources.find(s=>s.key===key)}
-function toggle(key,value){const s=find(key);if(s){s.enabled=value;save()}}
-function selectAll(){sources.forEach(s=>s.enabled=true);save();render()}
-function selectNone(){sources.forEach(s=>s.enabled=false);save();render()}
-function resetDefaults(){sources=clone(defaults);sources.forEach(s=>s.enabled=true);save();render();message('Configuração padrão restaurada.','ok')}
-function askSource(current){
- const title=prompt('Nome da legislação:',current?.title||''); if(!title)return null;
- const subject=prompt('Matéria:',current?.subject||'Direito Processual Civil'); if(!subject)return null;
- const url=prompt('URL oficial HTTPS (.gov.br, .leg.br ou .jus.br):',current?.url||''); if(!url)return null;
- const ranges=prompt('Artigos (ex.: 1-10, 25, 31-A) ou deixe vazio para documento integral:',current?.article_ranges?.join(', ')||'');
- const full=!ranges.trim();
- const key=current?.key||('custom-'+Date.now());
- return {key,subject,title,url,article_ranges:full?[]:ranges.split(',').map(x=>x.trim()).filter(Boolean),full_document:full,enabled:current?.enabled??true}
-}
-function addSource(){const s=askSource();if(!s)return;sources.push(s);save();render();message('Legislação adicionada.','ok')}
-function editSource(key){const i=sources.findIndex(s=>s.key===key);if(i<0)return;const s=askSource(sources[i]);if(!s)return;s.key=key;sources[i]=s;save();render();message('Legislação alterada.','ok')}
-function removeSource(key){if(!confirm('Excluir esta legislação da sua configuração local?'))return;sources=sources.filter(s=>s.key!==key);save();render();message('Legislação excluída.','ok')}
-function message(text,cls=''){const el=document.getElementById('status');el.textContent=text;el.className='status '+cls}
-function backend(){return document.getElementById('backend').value.trim().replace(/\/$/,'')}
-async function testBackend(){const b=backend();localStorage.setItem('projeto-tjsp-backend',b);const el=document.getElementById('backendStatus');if(!b){el.textContent='Informe a URL do backend.';return}el.textContent='Testando...';try{const r=await fetch(b+'/health');const data=await r.json();el.textContent=r.ok?'Conectado — '+JSON.stringify(data):'HTTP '+r.status;el.className='status ok'}catch(e){el.textContent='Não foi possível conectar. Verifique HTTPS, CORS, Tailscale e se a API está ativa.';el.className='status danger'}}
-async function compile(format){const selected=sources.filter(s=>s.enabled);if(!selected.length){message('Selecione ao menos uma legislação.','danger');return}const b=backend();if(!b){message('Configure primeiro o endereço do backend Tailscale.','danger');return}message('Consultando as fontes oficiais...');try{const r=await fetch(b+'/api/compilar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sources:selected,format})});if(!r.ok)throw new Error(await r.text());if(format==='html'){const blob=new Blob([await r.text()],{type:'text/html;charset=utf-8'});window.open(URL.createObjectURL(blob),'_blank')}else{const text=format==='json'?JSON.stringify(await r.json(),null,2):await r.text();const blob=new Blob([text],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='compilado-tjsp.'+(format==='json'?'json':'md');a.click();URL.revokeObjectURL(a.href)}message('Compilado gerado com sucesso.','ok')}catch(e){message('Erro: '+e.message,'danger')}}
-async function init(){
- document.getElementById('backend').value=localStorage.getItem('projeto-tjsp-backend')||'';
- try{const r=await fetch((backend()||'')+'/api/defaults');if(r.ok){defaults=(await r.json()).sources;load();render();return}}catch(e){}
- defaults=[];load();render();message('Configure o backend para carregar as legislações padrão.','danger')
-}
+function render(){const q=document.getElementById('filter').value.toLowerCase().trim();const box=document.getElementById('sources');const list=sources.filter(s=>(s.subject+' '+s.title+' '+s.key+' '+s.article_ranges.join(' ')).toLowerCase().includes(q));if(!list.length){box.innerHTML='<div class="empty muted">Nenhuma legislação encontrada.</div>';return}box.innerHTML=list.map(s=>`<div class="row"><input type="checkbox" ${s.enabled?'checked':''} onchange="toggle('${esc(s.key)}',this.checked)"><div><b>${esc(s.title)}</b><div class="small muted">${esc(s.subject)}</div></div><div class="range">${s.full_document?'Documento integral':esc(s.article_ranges.join(', '))}</div><div class="url small" title="${esc(s.url)}">${esc(s.url)}</div><div class="actions"><button onclick="openEditor('${esc(s.key)}')">Editar</button><button onclick="removeSource('${esc(s.key)}')">Excluir</button></div></div>`).join('')}
+function toggle(k,v){const s=sources.find(x=>x.key===k);if(s){s.enabled=v;save()}}function selectAll(){sources.forEach(s=>s.enabled=true);save();render()}function selectNone(){sources.forEach(s=>s.enabled=false);save();render()}function resetDefaults(){sources=clone(defaults);sources.forEach(s=>s.enabled=true);save();render();message('Configuração padrão restaurada.','ok')}
+function openEditor(key){editingKey=key||null;const s=sources.find(x=>x.key===key);document.getElementById('modalTitle').textContent=s?'Editar legislação':'Adicionar legislação';document.getElementById('fTitle').value=s?.title||'';document.getElementById('fSubject').value=s?.subject||'';document.getElementById('fUrl').value=s?.url||'';document.getElementById('fRanges').value=s?.article_ranges?.join(', ')||'';document.getElementById('modal').style.display='flex'}
+function closeEditor(){document.getElementById('modal').style.display='none';editingKey=null}
+function saveEditor(e){e.preventDefault();const title=document.getElementById('fTitle').value.trim(),subject=document.getElementById('fSubject').value.trim(),url=document.getElementById('fUrl').value.trim(),raw=document.getElementById('fRanges').value.trim();const item={key:editingKey||'custom-'+Date.now(),subject,title,url,article_ranges:raw?raw.split(',').map(x=>x.trim()).filter(Boolean):[],full_document:!raw,enabled:editingKey?(sources.find(x=>x.key===editingKey)?.enabled!==false):true};if(!/^https:\/\/([^/]+\.)+(gov\.br|leg\.br|jus\.br)(\/|$)/i.test(url)){alert('Informe uma URL HTTPS de domínio oficial (.gov.br, .leg.br ou .jus.br).');return}if(editingKey){const i=sources.findIndex(x=>x.key===editingKey);sources[i]=item}else sources.push(item);save();closeEditor();render();message('Legislação salva.','ok')}
+function removeSource(k){if(confirm('Excluir esta legislação da configuração local?')){sources=sources.filter(x=>x.key!==k);save();render()}}
+function message(t,c=''){const e=document.getElementById('status');e.textContent=t;e.className='status '+c}
+async function testBackend(){const b=backend();const e=document.getElementById('backendStatus');if(!b){e.textContent='Backend não configurado.';return}localStorage.setItem('projeto-tjsp-backend',b);e.textContent='Testando...';try{const r=await fetch(b+'/health');const d=await r.json();if(!r.ok)throw Error('HTTP '+r.status);e.textContent='Conectado — '+JSON.stringify(d);e.className='status ok'}catch(err){e.textContent='Falha: '+err.message;e.className='status danger'}}
+async function compile(format){const selected=sources.filter(s=>s.enabled);if(!selected.length){message('Selecione ao menos uma legislação.','danger');return}const b=backend();if(!b){message('API_URL não configurada.','danger');return}message('Consultando fontes oficiais...');try{const r=await fetch(b+'/api/compilar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sources:selected,format})});if(!r.ok)throw Error(await r.text());if(format==='html'){const blob=new Blob([await r.text()],{type:'text/html;charset=utf-8'});window.open(URL.createObjectURL(blob),'_blank')}else{const data=format==='json'?JSON.stringify(await r.json(),null,2):await r.text();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'text/plain;charset=utf-8'}));a.download='compilado-tjsp.'+(format==='json'?'json':'md');a.click()}message('Compilado gerado com sucesso.','ok')}catch(err){message('Erro: '+err.message,'danger')}}
+async function init(){const saved=localStorage.getItem('projeto-tjsp-backend');document.getElementById('backend').value=saved||CONFIGURED_API_URL||'';try{if(backend()){const r=await fetch(backend()+'/api/defaults');if(r.ok)defaults=(await r.json()).sources}}catch{}if(!defaults.length){defaults=[]}load();render();if(!backend())message('API_URL não configurada.','danger')}
 init();
-</script>
-</body>
-</html>
+</script></body></html>
