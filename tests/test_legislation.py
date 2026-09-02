@@ -1,5 +1,14 @@
+import pytest
+from fastapi.testclient import TestClient
+
 from app.config import SOURCES
 from app.legislation import article_in_ranges, clean_text, extract_articles
+from app.main import app
+
+
+@pytest.fixture
+def client():
+    return TestClient(app)
 
 
 def test_editorial_notes_are_removed():
@@ -48,3 +57,32 @@ def test_extracts_lei_10261_artigo_marker():
 def test_constitution_scope_matches_notice():
     source = next(s for s in SOURCES if s.key == "cf")
     assert source.article_ranges == ("5-17", "37-41", "92")
+
+
+def test_defaults_expose_the_complete_default_program(client):
+    response = client.get("/api/defaults")
+    assert response.status_code == 200
+    keys = {item["key"] for item in response.json()["sources"]}
+    assert {source.key for source in SOURCES} == keys
+
+
+def test_compile_rejects_non_official_source(client):
+    payload = {
+        "sources": [{
+            "key": "x", "subject": "Teste", "title": "Teste",
+            "url": "https://example.com/lei", "article_ranges": ["1"]
+        }],
+        "format": "json"
+    }
+    response = client.post("/api/compilar", json=payload)
+    assert response.status_code == 422
+
+
+def test_compile_rejects_duplicate_keys(client):
+    source = SOURCES[0]
+    item = {
+        "key": source.key, "subject": source.subject, "title": source.title,
+        "url": source.url, "article_ranges": list(source.article_ranges)
+    }
+    response = client.post("/api/compilar", json={"sources": [item, item], "format": "json"})
+    assert response.status_code == 422
