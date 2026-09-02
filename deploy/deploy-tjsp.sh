@@ -7,7 +7,7 @@ LOG="${PROJETO_TJSP_LOG:-/home/daniel/python/deploy-tjsp.log}"
 STATUS_DIR="${DEPLOY_STATUS_DIR:-/home/daniel/python/deploy-status/PROJETO-TJSP}"
 INSTALL_ROOT="${DEPLOY_INSTALL_ROOT:-/home/daniel/python}"
 SERVICE="${PROJETO_TJSP_SERVICE:-python-api.service}"
-LOCK="/tmp/projeto-tjsp-deploy.lock"
+LOCK="/tmp/python-api-deploy.lock"
 SHA="${1:-}"
 
 if [ -z "$SHA" ]; then
@@ -40,8 +40,10 @@ echo "Script carregado de: ${BASH_SOURCE[0]}"
 echo "Serviço: $SERVICE"
 echo "=========================================="
 
+# O serviço FastAPI é compartilhado com o agregador do GitHub Pages.
+# Um único lock impede que os dois projetos reiniciem o mesmo processo simultaneamente.
 exec 200>"$LOCK"
-flock -n 200 || { set_status failure "Outro deploy do TJSP já está em execução."; exit 1; }
+flock -n 200 || { set_status failure "Outro deploy que usa o serviço FastAPI já está em execução."; exit 1; }
 
 cd "$REPO"
 git fetch origin
