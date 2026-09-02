@@ -25,7 +25,18 @@ Acesse `http://127.0.0.1:8000/`.
 
 - `GET /health` — status.
 - `GET /fontes` — fontes oficiais e recortes configurados.
-- `GET /compilado` — gera o compilado em texto/Markdown.
+- `GET /compilado?format=html` — compilado HTML, pronto para imprimir/salvar como PDF pelo navegador.
+- `GET /compilado?format=markdown` — compilado em Markdown.
+- `GET /compilado?format=json` — metadados e artigos efetivamente extraídos.
+- `POST /api/compilar` — permite selecionar fontes e formato, por exemplo `{"keys":["cp","cpp"],"format":"html"}`.
+
+A documentação interativa fica em `/docs`.
+
+## Limpeza e segurança editorial
+
+O parser remove elementos HTML riscados (`del`, `s`, `strike`) e notas editoriais reconhecíveis. Referências internas como `conforme o art. 294` são preservadas porque somente marcadores de artigo no início de uma linha iniciam um novo dispositivo.
+
+O projeto **não grava uma cópia permanente da legislação no GitHub**: o texto é buscado no momento da geração. Isso reduz o risco de estudar uma versão antiga por engano.
 
 ## Princípios
 
