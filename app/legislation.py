@@ -127,7 +127,7 @@ def article_in_ranges(number: str, ranges: tuple[str, ...]) -> bool:
         if _is_range_spec(spec):
             start, _ = _article_id(spec.split("-", 1)[0])
             end, _ = _article_id(spec.split("-", 1)[1])
-            if start <= current_num <= end and not current_suffix:
+            if start <= current_num <= end:
                 return True
         else:
             target_num, target_suffix = _article_id(spec)
