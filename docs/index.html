@@ -3,136 +3,117 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Compilador Legislativo — TJSP</title>
+<title>PROJETO-TJSP — Compilador Legislativo</title>
 <style>
-:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f5f7fb;line-height:1.45}
-*{box-sizing:border-box}body{margin:0}.wrap{max-width:1240px;margin:auto;padding:30px 20px 60px}
-header{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:24px}h1{margin:0;font-size:30px}h2{font-size:19px;margin:0 0 14px}.muted{color:#647084}.small{font-size:13px}
-.card{background:#fff;border:1px solid #dfe4ec;border-radius:12px;padding:18px;margin-bottom:18px;box-shadow:0 2px 8px #00000008}.toolbar{display:grid;grid-template-columns:1fr auto;gap:10px}
-input,button,select{font:inherit;border:1px solid #cbd2dc;border-radius:8px;padding:10px;background:#fff}button{cursor:pointer}.primary{background:#172033;color:#fff}
-.actions{display:flex;gap:8px;flex-wrap:wrap}.section-title{display:flex;justify-content:space-between;gap:12px;align-items:center}
-.subject{margin-top:18px}.subject:first-child{margin-top:0}.subject h3{margin:0 0 8px;font-size:15px}.row{display:grid;grid-template-columns:28px minmax(220px,1.5fr) minmax(180px,1fr) minmax(180px,1fr) auto;gap:10px;align-items:center;padding:13px 0;border-bottom:1px solid #edf0f5}.row:last-child{border:0}.range{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}.url{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.status{min-height:24px;margin-top:12px}.ok{color:#137333}.danger{color:#a61b1b}.empty{text-align:center;padding:28px}.modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:20px;z-index:10}.dialog{background:#fff;border-radius:14px;padding:22px;max-width:680px;width:100%;max-height:90vh;overflow:auto}.form{display:grid;gap:10px}.form label{display:grid;gap:5px;font-size:13px;font-weight:600}.form input{width:100%}.check{display:flex!important;grid-template-columns:none!important;align-items:center;gap:8px}.check input{width:auto}.badge{padding:5px 9px;border-radius:999px;background:#eef1f6;font-size:12px}.count{font-weight:600}@media(max-width:900px){header{display:block}.row{grid-template-columns:28px 1fr}.row .range,.row .url,.row .actions{grid-column:2}}
+:root{--bg:#f3f5f8;--surface:#fff;--surface-2:#f7f8fa;--text:#202631;--muted:#697382;--line:#dfe4ea;--accent:#18385d;--accent-soft:#e8eff7;--danger:#9b2d2d;--shadow:0 10px 30px rgba(18,29,44,.06);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text);line-height:1.45}
+*{box-sizing:border-box}body{margin:0;background:var(--bg)}button,input,select{font:inherit}button{cursor:pointer}.shell{max-width:1320px;margin:auto;padding:28px 22px 70px}
+header{display:flex;justify-content:space-between;gap:24px;align-items:end;margin-bottom:24px}.brand h1{margin:0;font-size:clamp(27px,3vw,38px);letter-spacing:-.035em}.brand p{margin:7px 0 0;color:var(--muted);max-width:760px}.local-note{font-size:12px;color:var(--muted);text-align:right;max-width:230px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:20px;margin-bottom:18px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.toolbar .search{flex:1 1 360px}.search input,.form input{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 13px;outline:none;background:#fff}.search input:focus,.form input:focus{border-color:#8aa3bf;box-shadow:0 0 0 3px #e3ebf4}.btn{border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px 13px;color:#38414c}.btn:hover{background:var(--surface-2)}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{filter:brightness(1.05)}.btn.danger{color:var(--danger)}
+.section-head{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:13px}.section-head h2{font-size:17px;margin:0}.pill{padding:6px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:750;font-size:12px}.subtle{font-size:12px;color:var(--muted)}
+.library-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.metric{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:13px}.metric strong{display:block;font-size:22px;letter-spacing:-.02em}.metric span{font-size:12px;color:var(--muted)}
+.filters{display:grid;grid-template-columns:1fr auto auto;gap:10px;margin-bottom:12px}.select{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:#fff;color:var(--text)}.list{display:grid;gap:10px}.subject-group{border-top:1px solid var(--line);padding-top:13px;margin-top:13px}.subject-group:first-child{border-top:0;padding-top:0;margin-top:0}.subject-title{font-size:11px;text-transform:uppercase;letter-spacing:.09em;font-weight:850;color:var(--muted);margin-bottom:6px}.row{display:grid;grid-template-columns:32px minmax(220px,1.7fr) minmax(180px,.8fr) auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid #edf0f3}.row:last-child{border-bottom:0}.row input{width:18px;height:18px;accent-color:var(--accent)}.law-name{font-weight:750}.law-meta{font-size:12px;color:var(--muted)}.actions{display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap}.actions .btn{padding:7px 9px;font-size:12px}.empty{padding:30px;text-align:center;color:var(--muted)}
+.generation{display:grid;grid-template-columns:1.5fr 1fr;gap:12px;align-items:stretch}.generation-main{padding:4px 0}.generation-main h2{margin:0 0 7px;font-size:18px}.generation-main p{margin:0;color:var(--muted);font-size:13px}.generation-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.feature-panel{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--surface-2);font-size:12px;color:var(--muted)}.feature-panel strong{display:block;color:var(--text);margin-bottom:6px}.feature-panel span{display:block;margin:4px 0}
+.status{min-height:21px;margin-top:12px;font-size:13px}.status.ok{color:#18733a}.status.danger{color:var(--danger)}.status.loading{color:var(--accent)}
+.modal{position:fixed;inset:0;background:rgba(12,18,27,.62);display:none;align-items:center;justify-content:center;padding:20px;z-index:30}.dialog{width:min(680px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.2)}.dialog h2{margin:0 0 15px;font-size:20px}.form{display:grid;gap:12px}.form label{display:grid;gap:6px;font-size:12px;font-weight:800}.form input{font-weight:400}.check{display:flex!important;align-items:center;gap:8px}.check input{width:auto}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}.help{font-weight:400;color:var(--muted);font-size:11px}
+.toast{position:fixed;right:18px;bottom:18px;z-index:40;background:#202631;color:#fff;border-radius:10px;padding:11px 13px;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.18);opacity:0;transform:translateY(8px);transition:.18s}.toast.show{opacity:1;transform:translateY(0)}
+@media(max-width:900px){header{align-items:start;display:block}.local-note{text-align:left;margin-top:8px}.generation{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.row{grid-template-columns:32px 1fr}.row .law-meta,.row .actions{grid-column:2}.actions{justify-content:flex-start}.library-summary{grid-template-columns:1fr 1fr 1fr}}
+@media(max-width:560px){.shell{padding:18px 12px 50px}.card{padding:15px}.library-summary{grid-template-columns:1fr}.row{grid-template-columns:28px 1fr}.row input{width:16px;height:16px}}
 </style>
 </head>
 <body>
-<div class="wrap">
-<header>
-  <div><h1>Compilador Legislativo — TJSP</h1><div class="muted">Material de estudo a partir de fontes legislativas oficiais.</div></div>
-  <div class="small muted">Suas alterações ficam somente neste navegador.</div>
-</header>
+<div class="shell">
+  <header>
+    <div class="brand"><h1>Compilador Legislativo — TJSP</h1><p>Monte seu material de estudo com as legislações e artigos que realmente precisa revisar, mantendo a <strong>lei seca em primeiro plano</strong>.</p></div>
+    <div class="local-note">A seleção fica somente neste navegador.<br>O texto é consultado na fonte oficial no momento da geração.</div>
+  </header>
 
-<section class="card">
-  <div class="section-title"><h2>Legislações</h2><span id="selectedCount" class="badge">0 selecionadas</span></div>
-  <div class="toolbar">
-    <input id="filter" placeholder="Pesquisar matéria, legislação ou artigo..." oninput="render()">
-    <button onclick="openEditor()">+ Adicionar legislação</button>
-  </div>
-  <div class="actions" style="margin-top:12px">
-    <button onclick="selectAll()">Selecionar todas</button>
-    <button onclick="selectNone()">Desmarcar todas</button>
-    <button onclick="resetDefaults()">Restaurar padrão</button>
-  </div>
-  <div id="sources"></div>
-  <div id="status" class="status"></div>
-</section>
+  <section class="card">
+    <div class="section-head"><h2>1. Monte seu programa</h2><span id="selectedCount" class="pill">0 selecionadas</span></div>
+    <div class="filters">
+      <div class="search"><input id="filter" placeholder="Pesquisar legislação, matéria ou artigo..." oninput="render()" autocomplete="off"></div>
+      <select id="subjectFilter" class="select" onchange="render()"><option value="">Todas as matérias</option></select>
+      <button class="btn" onclick="openEditor()">+ Adicionar</button>
+    </div>
+    <div class="actions" style="justify-content:flex-start;margin-bottom:11px">
+      <button class="btn" onclick="selectAll()">Selecionar todas</button>
+      <button class="btn" onclick="selectNone()">Desmarcar todas</button>
+      <button class="btn" onclick="resetDefaults()">Restaurar padrão</button>
+    </div>
+    <div class="library-summary">
+      <div class="metric"><strong id="metricLaws">0</strong><span>legislações no programa</span></div>
+      <div class="metric"><strong id="metricSubjects">0</strong><span>matérias</span></div>
+      <div class="metric"><strong id="metricSelected">0</strong><span>selecionadas para gerar</span></div>
+    </div>
+    <div id="sources" class="list"></div>
+    <div id="status" class="status"></div>
+  </section>
 
-<section class="card">
-  <h2>Compilar material</h2>
-  <div class="actions">
-    <button class="primary" onclick="compile('html')">Gerar material</button>
-    <button onclick="compile('markdown')">Baixar Markdown</button>
-    <button onclick="compile('json')">Baixar JSON</button>
-  </div>
-  <p class="muted small">O texto é consultado diretamente nas fontes oficiais no momento da geração e recebe limpeza de notas editoriais.</p>
-</section>
+  <section class="card">
+    <div class="generation">
+      <div class="generation-main">
+        <span class="subtle">2. Gere o material</span>
+        <h2>Lei seca com visual de revisão</h2>
+        <p>A saída reorganiza visualmente caput, parágrafos, incisos e alíneas, cria índice de navegação e permite pesquisa dentro dos artigos. O conteúdo normativo não é substituído por um resumo.</p>
+        <div class="generation-actions">
+          <button class="btn primary" onclick="compile('html')">Gerar material de estudo</button>
+          <button class="btn" onclick="compile('markdown')">Baixar Markdown</button>
+          <button class="btn" onclick="compile('json')">Baixar JSON</button>
+        </div>
+      </div>
+      <div class="feature-panel"><strong>O material gerado terá</strong><span>✓ índice por matéria, legislação e artigo</span><span>✓ busca instantânea na lei seca</span><span>✓ modo compacto para revisão</span><span>✓ modo foco e tema escuro</span><span>✓ links diretos para cada artigo</span><span>✓ fonte oficial e data da consulta</span></div>
+    </div>
+  </section>
 </div>
 
-<div id="modal" class="modal">
+<div id="modal" class="modal" onclick="if(event.target===this)closeEditor()">
   <div class="dialog">
     <h2 id="modalTitle">Adicionar legislação</h2>
     <form class="form" onsubmit="saveEditor(event)">
       <label>Nome<input id="fTitle" required></label>
-      <label>Matéria<input id="fSubject" required></label>
-      <label>URL oficial HTTPS<input id="fUrl" type="url" placeholder="https://...gov.br/..." required></label>
-      <label>Artigos<input id="fRanges" placeholder="1-10, 25, 31-A"></label>
+      <label>Matéria<input id="fSubject" required placeholder="Ex.: Direito Processual Civil"></label>
+      <label>URL oficial HTTPS<input id="fUrl" type="url" placeholder="https://...gov.br/..." required><span class="help">Aceita apenas domínios oficiais .gov.br, .leg.br ou .jus.br.</span></label>
+      <label>Artigos ou intervalos<input id="fRanges" placeholder="Ex.: 3-19, 37, 92-A"><span class="help">Separe por vírgulas. Para toda a norma, marque documento integral.</span></label>
       <label class="check"><input id="fFull" type="checkbox"> Usar documento integral</label>
-      <div class="actions"><button type="button" onclick="closeEditor()">Cancelar</button><button class="primary" type="submit">Salvar</button></div>
+      <div class="dialog-actions"><button type="button" class="btn" onclick="closeEditor()">Cancelar</button><button class="btn primary" type="submit">Salvar legislação</button></div>
     </form>
   </div>
 </div>
-
+<div id="toast" class="toast"></div>
 <script src="defaults.js"></script>
 <script>
 const CONFIGURED_API_URL=__API_URL__;
-const STORAGE_KEY='projeto-tjsp-config-v4';
+const STORAGE_KEY='projeto-tjsp-config-v5';
 const clone=v=>JSON.parse(JSON.stringify(v));
 let defaults=clone(window.TJSP_DEFAULTS||[]),sources=[],editingKey=null;
 const apiBase=()=>String(CONFIGURED_API_URL||'').trim().replace(/\/$/,'');
 const isOfficialUrl=url=>/^https:\/\/([^/]+\.)+(gov\.br|leg\.br|jus\.br)(\/|$)/i.test(url);
 function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(sources))}
-function load(){
-  try{
-    const raw=localStorage.getItem(STORAGE_KEY);
-    const parsed=raw?JSON.parse(raw):null;
-    sources=Array.isArray(parsed)&&parsed.length?parsed:clone(defaults);
-  }catch{sources=clone(defaults)}
-  sources.forEach(s=>s.enabled=s.enabled!==false);
-}
+function load(){try{const raw=localStorage.getItem(STORAGE_KEY),parsed=raw?JSON.parse(raw):null;sources=Array.isArray(parsed)&&parsed.length?parsed:clone(defaults)}catch{sources=clone(defaults)}sources.forEach(s=>s.enabled=s.enabled!==false)}
 function esc(v){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function selectedCount(){return sources.filter(s=>s.enabled).length}
+function subjects(){return [...new Set(sources.map(s=>s.subject))].sort((a,b)=>a.localeCompare(b,'pt-BR'))}
+function updateSubjectFilter(){const select=document.getElementById('subjectFilter'),value=select.value;select.innerHTML='<option value="">Todas as matérias</option>'+subjects().map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');select.value=subjects().includes(value)?value:''}
 function render(){
-  const q=document.getElementById('filter').value.toLowerCase().trim();
+  updateSubjectFilter();
+  const q=document.getElementById('filter').value.toLowerCase().trim(),subject=document.getElementById('subjectFilter').value;
+  const filtered=sources.filter(s=>{const blob=(s.subject+' '+s.title+' '+s.key+' '+(s.article_ranges||[]).join(' ')).toLowerCase();return (!q||blob.includes(q))&&(!subject||s.subject===subject)});
   const box=document.getElementById('sources');
-  const filtered=sources.filter(s=>(s.subject+' '+s.title+' '+s.key+' '+(s.article_ranges||[]).join(' ')).toLowerCase().includes(q));
-  const subjects=[...new Set(filtered.map(s=>s.subject))];
-  if(!filtered.length){box.innerHTML='<div class="empty muted">Nenhuma legislação encontrada.</div>';return}
-  box.innerHTML=subjects.map(subject=>{
-    const rows=filtered.filter(s=>s.subject===subject).map(s=>`<div class="row"><input type="checkbox" ${s.enabled?'checked':''} onchange="toggle('${esc(s.key)}',this.checked)"><div><b>${esc(s.title)}</b></div><div class="range">${s.full_document?'Documento integral':esc((s.article_ranges||[]).join(', '))}</div><div class="url small" title="${esc(s.url)}">${esc(s.url)}</div><div class="actions"><button onclick="openEditor('${esc(s.key)}')">Editar</button><button onclick="removeSource('${esc(s.key)}')">Excluir</button></div></div>`).join('');
-    return `<div class="subject"><h3>${esc(subject)}</h3>${rows}</div>`;
-  }).join('');
-  document.getElementById('selectedCount').textContent=sources.filter(s=>s.enabled).length+' selecionadas';
+  if(!filtered.length){box.innerHTML='<div class="empty">Nenhuma legislação encontrada com os filtros atuais.</div>'}
+  else{const groups=[...new Set(filtered.map(s=>s.subject))];box.innerHTML=groups.map(sub=>`<div class="subject-group"><div class="subject-title">${esc(sub)}</div>${filtered.filter(s=>s.subject===sub).map(s=>`<div class="row"><input type="checkbox" ${s.enabled?'checked':''} onchange="toggle('${esc(s.key)}',this.checked)" aria-label="Selecionar ${esc(s.title)}"><div><div class="law-name">${esc(s.title)}</div></div><div class="law-meta">${s.full_document?'Documento integral':esc((s.article_ranges||[]).join(', '))}</div><div class="actions"><button class="btn" onclick="openEditor('${esc(s.key)}')">Editar</button><button class="btn danger" onclick="removeSource('${esc(s.key)}')">Excluir</button></div></div>`).join('')}</div>`).join('')}
+  const selected=selectedCount();document.getElementById('selectedCount').textContent=selected+' selecionadas';document.getElementById('metricLaws').textContent=sources.length;document.getElementById('metricSubjects').textContent=subjects().length;document.getElementById('metricSelected').textContent=selected;
 }
 function toggle(k,v){const s=sources.find(x=>x.key===k);if(s){s.enabled=v;save();render()}}
-function selectAll(){sources.forEach(s=>s.enabled=true);save();render()}
-function selectNone(){sources.forEach(s=>s.enabled=false);save();render()}
-function resetDefaults(){sources=clone(defaults);sources.forEach(s=>s.enabled=true);save();render();message('Programa padrão restaurado.','ok')}
-function openEditor(key){
-  editingKey=key||null;const s=sources.find(x=>x.key===key);
-  document.getElementById('modalTitle').textContent=s?'Editar legislação':'Adicionar legislação';
-  document.getElementById('fTitle').value=s?.title||'';document.getElementById('fSubject').value=s?.subject||'';document.getElementById('fUrl').value=s?.url||'';document.getElementById('fRanges').value=s?.article_ranges?.join(', ')||'';document.getElementById('fFull').checked=Boolean(s?.full_document);
-  document.getElementById('modal').style.display='flex'
-}
+function selectAll(){sources.forEach(s=>s.enabled=true);save();render();toast('Todas as legislações foram selecionadas.')}
+function selectNone(){sources.forEach(s=>s.enabled=false);save();render();toast('Seleção limpa.')}
+function resetDefaults(){if(!confirm('Restaurar o programa padrão? Suas alterações locais serão substituídas.'))return;sources=clone(defaults);sources.forEach(s=>s.enabled=true);save();render();toast('Programa padrão restaurado.')}
+function openEditor(key){editingKey=key||null;const s=sources.find(x=>x.key===key);document.getElementById('modalTitle').textContent=s?'Editar legislação':'Adicionar legislação';document.getElementById('fTitle').value=s?.title||'';document.getElementById('fSubject').value=s?.subject||'';document.getElementById('fUrl').value=s?.url||'';document.getElementById('fRanges').value=s?.article_ranges?.join(', ')||'';document.getElementById('fFull').checked=Boolean(s?.full_document);document.getElementById('modal').style.display='flex';setTimeout(()=>document.getElementById('fTitle').focus(),20)}
 function closeEditor(){document.getElementById('modal').style.display='none';editingKey=null}
-function saveEditor(e){
-  e.preventDefault();
-  const title=document.getElementById('fTitle').value.trim(),subject=document.getElementById('fSubject').value.trim(),url=document.getElementById('fUrl').value.trim(),raw=document.getElementById('fRanges').value.trim(),full=document.getElementById('fFull').checked;
-  if(!isOfficialUrl(url)){alert('Informe uma URL HTTPS de domínio oficial (.gov.br, .leg.br ou .jus.br).');return}
-  const item={key:editingKey||'custom-'+Date.now(),subject,title,url,article_ranges:full?[]:raw.split(',').map(x=>x.trim()).filter(Boolean),full_document:full,enabled:editingKey?(sources.find(x=>x.key===editingKey)?.enabled!==false):true};
-  if(editingKey){const i=sources.findIndex(x=>x.key===editingKey);sources[i]=item}else sources.push(item);
-  save();closeEditor();render();message('Legislação salva.','ok')
-}
-function removeSource(k){if(confirm('Excluir esta legislação da configuração local?')){sources=sources.filter(x=>x.key!==k);save();render()}}
-function message(t,c=''){const e=document.getElementById('status');e.textContent=t;e.className='status '+c}
-async function compile(format){
-  const selected=sources.filter(s=>s.enabled),base=apiBase();
-  if(!selected.length){message('Selecione ao menos uma legislação.','danger');return}
-  if(!base){message('Não foi possível preparar a geração.','danger');return}
-  message('Consultando as fontes oficiais...');
-  try{
-    const r=await fetch(base+'/estudos/api/compilar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sources:selected,format})});
-    if(!r.ok)throw Error(await r.text());
-    if(format==='html'){
-      const html=await r.text(),w=window.open('','_blank');
-      if(!w)throw Error('O navegador bloqueou a nova janela.');
-      w.document.open();w.document.write(html);w.document.close();
-    }else{
-      const data=format==='json'?JSON.stringify(await r.json(),null,2):await r.text();
-      const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'text/plain;charset=utf-8'}));a.download='compilado-tjsp.'+(format==='json'?'json':'md');a.click();URL.revokeObjectURL(a.href)
-    }
-    message('Material gerado com sucesso.','ok')
-  }catch(err){message('Erro: '+err.message,'danger')}
-}
-function init(){load();render()}
-init();
+function saveEditor(e){e.preventDefault();const title=document.getElementById('fTitle').value.trim(),subject=document.getElementById('fSubject').value.trim(),url=document.getElementById('fUrl').value.trim(),raw=document.getElementById('fRanges').value.trim(),full=document.getElementById('fFull').checked;if(!isOfficialUrl(url)){toast('Informe uma URL HTTPS oficial (.gov.br, .leg.br ou .jus.br).',true);return}const ranges=full?[]:raw.split(',').map(x=>x.trim()).filter(Boolean);const item={key:editingKey||'custom-'+Date.now(),subject,title,url,article_ranges:ranges,full_document:full,enabled:editingKey?(sources.find(x=>x.key===editingKey)?.enabled!==false):true};if(editingKey){const i=sources.findIndex(x=>x.key===editingKey);sources[i]=item}else sources.push(item);save();closeEditor();render();toast('Legislação salva.')}
+function removeSource(k){const s=sources.find(x=>x.key===k);if(!s||!confirm('Excluir “'+s.title+'” da configuração local?'))return;sources=sources.filter(x=>x.key!==k);save();render();toast('Legislação removida.')}
+function setStatus(text,kind=''){const e=document.getElementById('status');e.textContent=text;e.className='status '+kind}
+function toast(text,error=false){const e=document.getElementById('toast');e.textContent=text;e.style.background=error?'#9b2d2d':'#202631';e.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove('show'),2200)}
+async function compile(format){const selected=sources.filter(s=>s.enabled),base=apiBase();if(!selected.length){setStatus('Selecione ao menos uma legislação.','danger');return}if(!base){setStatus('A URL da API não foi configurada.','danger');return}setStatus('Consultando as fontes oficiais e montando o material...','loading');document.querySelectorAll('.generation-actions .btn').forEach(b=>b.disabled=true);try{const r=await fetch(base+'/api/compilar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sources:selected,format})});if(!r.ok){let detail='Erro HTTP '+r.status;try{const d=await r.json();detail=d.detail||detail}catch{}throw Error(detail)}if(format==='html'){const html=await r.text(),w=window.open('','_blank');if(!w)throw Error('O navegador bloqueou a nova aba.');w.document.open();w.document.write(html);w.document.close()}else{const data=format==='json'?JSON.stringify(await r.json(),null,2):await r.text(),blob=new Blob([data],{type:format==='json'?'application/json;charset=utf-8':'text/markdown;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='compilado-tjsp.'+(format==='json'?'json':'md');document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}setStatus('Material gerado com sucesso.','ok');toast('Material gerado.') }catch(err){setStatus('Não foi possível gerar o material: '+err.message,'danger');toast('Falha na geração.',true)}finally{document.querySelectorAll('.generation-actions .btn').forEach(b=>b.disabled=false)}}
+load();render();
 </script>
 </body>
 </html>
