@@ -5,9 +5,27 @@ Compilador legislativo para estudos voltados ao TJSP. A aplicação usa **FastAP
 ## Arquitetura
 
 - **GitHub Pages:** interface web estática em `docs/index.html`.
-- **FastAPI:** roda no servidor do usuário, acessível pelo endereço HTTPS do Tailscale.
+- **FastAPI:** roda no mesmo servidor e no mesmo processo do agregador FastAPI já utilizado pelos demais projetos.
+- **Rota pública:** o agregador monta este aplicativo em `/estudos`; não existe um servidor ou uma porta exclusiva para o TJSP.
 - **localStorage:** guarda no navegador a seleção, inclusão, alteração e exclusão de legislações. O backend não usa SQLite nem outro banco para essas preferências.
 - **Fontes oficiais:** o backend consulta a legislação diretamente no momento da geração.
+
+## Integração com o servidor compartilhado
+
+O repositório é independente do agregador. O arquivo `tjsp_main.py` expõe `app` e permite que o `main.py` do servidor compartilhado o carregue como os demais projetos.
+
+No agregador, a configuração fica conceitualmente assim:
+
+```python
+app_tjsp = load_app_from_path(
+    "tjsp_main",
+    os.path.join(PROJETO_TJSP_ROOT, "tjsp_main.py"),
+    PROJETO_TJSP_ROOT,
+)
+app.mount("/estudos", app_tjsp)
+```
+
+O caminho de `PROJETO_TJSP_ROOT` deve apontar para o clone do repositório no servidor Ubuntu. O processo continua sendo o mesmo `uvicorn main:app`/serviço FastAPI já existente.
 
 ## Programa padrão
 
@@ -33,6 +51,8 @@ As alterações ficam no `localStorage` do navegador e permanecem após recarreg
 
 ## Backend
 
+Para execução isolada do projeto:
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
@@ -40,19 +60,27 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Endpoints principais:
+Quando executado pelo agregador compartilhado, o entrypoint utilizado é `tjsp_main:app` e a aplicação é montada em `/estudos`.
 
-- `GET /health` — status do backend.
-- `GET /api/defaults` — programa padrão.
-- `GET /fontes` — fontes padrão.
-- `POST /api/compilar` — recebe a configuração atual do navegador e gera o material.
-- `GET /docs` — documentação interativa do FastAPI.
+Endpoints dentro do namespace do projeto:
+
+- `GET /estudos/health` — status do backend.
+- `GET /estudos/api/defaults` — programa padrão.
+- `GET /estudos/fontes` — fontes padrão.
+- `POST /estudos/api/compilar` — recebe a configuração atual do navegador e gera o material.
+- `GET /estudos/docs` — documentação interativa do FastAPI.
 
 O backend não mantém a configuração do usuário. Cada compilação recebe explicitamente as fontes selecionadas pela interface.
 
 ## GitHub Pages
 
 O workflow `.github/workflows/pages.yml` publica automaticamente o conteúdo de `docs/` no GitHub Pages a cada atualização da `main`.
+
+## Deploy
+
+O workflow `.github/workflows/deploy-backend.yml` executa os testes antes de solicitar o deploy ao webhook compartilhado do servidor Ubuntu. O webhook deve identificar o projeto pelo repositório/projeto informado no payload e encaminhar o commit para o script de deploy correspondente.
+
+O mesmo `API_URL` é usado pelos workflows para acessar `/deploy` e `/deploy-status`; ele continua sendo apenas o endereço base da API compartilhada.
 
 ## Limpeza editorial
 
