@@ -1,0 +1,73 @@
+name: Deploy static content to Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure API endpoint
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$API_URL" || { echo 'Secret API_URL não configurado.'; exit 1; }
+
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+
+          path = Path("docs/index.html")
+          text = path.read_text(encoding="utf-8")
+          marker = "const CONFIGURED_API_URL="
+          start = text.index(marker)
+          end = text.index(";", start) + 1
+          value = json.dumps(os.environ["API_URL"], ensure_ascii=False)
+          text = text[:start] + marker + value + text[end:]
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Validate static site
+        run: |
+          set -euo pipefail
+          test -f docs/index.html
+          test -s docs/defaults.js
+          grep -q 'Código Penal' docs/defaults.js
+          grep -q 'Código de Processo Penal' docs/defaults.js
+          grep -q 'Código de Processo Civil' docs/defaults.js
+          grep -q 'Constituição da República Federativa do Brasil' docs/defaults.js
+          grep -q 'Lei nº 10.261/1968' docs/defaults.js
+          ! grep -q 'id="backend"' docs/index.html
+          ! grep -q 'Testar conexão' docs/index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './docs'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
