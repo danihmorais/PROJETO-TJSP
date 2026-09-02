@@ -5,7 +5,6 @@ REPO="${DANIHMORAIS_GITHUB_PAGES_REPO:-/home/daniel/Downloads/danihmorais.github
 VENV="${DANIHMORAIS_GITHUB_PAGES_VENV:-/home/daniel/python/.venv}"
 LOG="${DANIHMORAIS_GITHUB_PAGES_LOG:-/home/daniel/python/deploy.log}"
 STATUS_DIR="${DEPLOY_STATUS_DIR:-/home/daniel/python/deploy-status}/DANIHMORAIS-GITHUB-PAGES"
-INSTALL_ROOT="${DEPLOY_INSTALL_ROOT:-/home/daniel/python}"
 SERVICE="${DANIHMORAIS_GITHUB_PAGES_SERVICE:-python-api.service}"
 LOCK="/tmp/danihmorais-github-pages-deploy.lock"
 SHA="${1:-}"
@@ -25,7 +24,7 @@ PY
 }
 
 exec >> "$LOG" 2>&1
-trap 'echo "$(date) - DEPLOY SITE FALHOU"; set_status failure "Deploy falhou. Consulte deploy.log."' ERR
+trap 'rc=$?; echo "$(date) - DEPLOY SITE FALHOU"; set_status failure "Deploy falhou na etapa: $BASH_COMMAND"; exit "$rc"' ERR
 
 echo ""
 echo "=========================================="
@@ -47,10 +46,68 @@ git rev-parse HEAD
 "$VENV/bin/python" -m pip check
 "$VENV/bin/python" -c "import main; print('IMPORT MAIN OK')"
 
+# Este serviço é compartilhado pelos dois repositórios. A fonte de execução
+# deve ser sempre o agregador FastAPI deste repositório, que monta também
+# o aplicativo PROJETO-TJSP em /estudos.
+UNIT_FILE="$(mktemp)"
+trap 'rm -f "$UNIT_FILE"' EXIT
+cat > "$UNIT_FILE" <<EOF
+[Unit]
+Description=Universo da Licitação - API agregadora
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$(id -un)
+WorkingDirectory=$REPO
+Environment=PYTHONPATH=$REPO
+ExecStart=$VENV/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+/usr/bin/sudo -n /usr/bin/install -m 0644 "$UNIT_FILE" "/etc/systemd/system/$SERVICE"
+/usr/bin/sudo -n /usr/bin/systemctl daemon-reload
 /usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
-sleep 3
+
+for i in $(seq 1 20); do
+    if /usr/bin/systemctl is-active --quiet "$SERVICE"; then
+        break
+    fi
+    sleep 1
+done
 /usr/bin/systemctl is-active --quiet "$SERVICE" || { echo "Serviço $SERVICE não iniciou."; exit 1; }
 
+health_check=""
+for i in $(seq 1 20); do
+    if health_check=$(/usr/bin/curl --ipv4 --fail --silent --show-error --connect-timeout 2 --max-time 3 http://127.0.0.1:8000/health 2>&1); then
+        break
+    fi
+    echo "Aguardando /health ($i/20): ${health_check:-sem resposta}"
+    sleep 1
+done
+
+/usr/bin/python3 - "$health_check" <<'PY'
+import json, sys
+payload = json.loads(sys.argv[1])
+if not isinstance(payload, dict) or payload.get("status") != "ok":
+    raise SystemExit("GET /health não retornou status=ok")
+PY
+
+estudos_check=$(/usr/bin/curl --ipv4 --fail --silent --show-error --max-time 10 http://127.0.0.1:8000/estudos/health)
+/usr/bin/python3 - "$estudos_check" <<'PY'
+import json, sys
+payload = json.loads(sys.argv[1])
+if not isinstance(payload, dict) or payload.get("status") != "ok":
+    raise SystemExit("/estudos/health não retornou status=ok")
+PY
+
+echo "GET /health OK"
+echo "GET /estudos/health OK"
 set_status success "Deploy concluído com sucesso"
 echo "$(date) - DEPLOY SITE CONCLUÍDO COM SUCESSO"
 echo "=========================================="
