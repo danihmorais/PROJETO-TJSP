@@ -36,14 +36,13 @@ echo ""
 echo "=========================================="
 echo "$(date) - DEPLOY TJSP INICIADO"
 echo "Commit: $SHA"
-echo "Script carregado de: ${BASH_SOURCE[0]}"
 echo "Serviço: $SERVICE"
 echo "=========================================="
 
-# O serviço FastAPI é compartilhado com o agregador do GitHub Pages.
-# Um único lock impede que os dois projetos reiniciem o mesmo processo simultaneamente.
+# O serviço FastAPI é compartilhado com o agregador do site.
+# O lock é bloqueante: deploys concorrentes são serializados em vez de falharem.
 exec 200>"$LOCK"
-flock -n 200 || { set_status failure "Outro deploy que usa o serviço FastAPI já está em execução."; exit 1; }
+flock 200
 
 cd "$REPO"
 git fetch origin
@@ -64,7 +63,6 @@ PYTHONPATH="$REPO" "$VENV/bin/python" -c "from app.main import app; print(app.ti
 /usr/bin/sudo -n /usr/bin/systemctl daemon-reload
 /usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
 
-# Aguarda o serviço ficar ativo.
 for i in $(seq 1 15); do
     if /usr/bin/systemctl is-active --quiet "$SERVICE"; then
         break
@@ -73,14 +71,6 @@ for i in $(seq 1 15); do
 done
 /usr/bin/systemctl is-active --quiet "$SERVICE" || { echo "Serviço $SERVICE não iniciou."; exit 1; }
 
-# Mostra imediatamente o estado do serviço e o listener, facilitando o diagnóstico.
-echo "Estado do serviço após restart:"
-/usr/bin/systemctl is-active "$SERVICE" || true
-echo "Listeners TCP relacionados à porta 8000:"
-/usr/bin/ss -ltnp 2>/dev/null | /usr/bin/grep -E '(:8000[[:space:]]|:8000$)' || echo "Nenhum listener encontrado em 8000."
-
-# O systemd pode marcar o serviço como ativo antes de o Uvicorn estar pronto
-# para aceitar conexões. Aguarda o endpoint de health responder corretamente.
 health_check=""
 health_ok=0
 for i in $(seq 1 20); do
@@ -95,8 +85,6 @@ done
 
 if [ "$health_ok" -ne 1 ]; then
     echo "GET /health não respondeu após 20 tentativas."
-    echo "Listeners TCP no momento da falha:"
-    /usr/bin/ss -ltnp 2>/dev/null | /usr/bin/grep -E '(:8000[[:space:]]|:8000$)' || echo "Nenhum listener encontrado em 8000."
     /usr/bin/systemctl status "$SERVICE" --no-pager -l || true
     /usr/bin/journalctl -u "$SERVICE" -n 40 --no-pager || true
     set_status failure "GET /health não respondeu após 20 tentativas: ${health_check:-sem resposta}"
