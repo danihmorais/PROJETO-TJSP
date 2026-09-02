@@ -6,7 +6,7 @@ VENV="${DANIHMORAIS_GITHUB_PAGES_VENV:-/home/daniel/python/.venv}"
 LOG="${DANIHMORAIS_GITHUB_PAGES_LOG:-/home/daniel/python/deploy.log}"
 STATUS_DIR="${DEPLOY_STATUS_DIR:-/home/daniel/python/deploy-status}/DANIHMORAIS-GITHUB-PAGES"
 SERVICE="${DANIHMORAIS_GITHUB_PAGES_SERVICE:-python-api.service}"
-LOCK="/tmp/danihmorais-github-pages-deploy.lock"
+LOCK="/tmp/python-api-deploy.lock"
 SHA="${1:-}"
 
 if [ -z "$SHA" ]; then echo "SHA não informado"; exit 1; fi
@@ -33,8 +33,10 @@ echo "Commit: $SHA"
 echo "Serviço: $SERVICE"
 echo "=========================================="
 
+# O serviço FastAPI é compartilhado pelos dois repositórios.
+# Um único lock impede reinícios concorrentes e evita que um deploy sobrescreva o outro.
 exec 200>"$LOCK"
-flock -n 200 || { set_status failure "Outro deploy do site já está em execução."; exit 1; }
+flock -n 200 || { set_status failure "Outro deploy que usa o serviço FastAPI já está em execução."; exit 1; }
 
 cd "$REPO"
 git fetch origin
