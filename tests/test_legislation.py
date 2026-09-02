@@ -1,12 +1,12 @@
+from datetime import datetime, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.config import SOURCES
-from app.legislation import article_in_ranges, clean_text, extract_articles
+from app.legislation import Device, article_in_ranges, clean_text, extract_articles
 from app.main import app
 from app.render import parse_legal_units, render_html
-from app.legislation import Device
-from datetime import datetime, timezone
 
 
 @pytest.fixture
@@ -22,9 +22,30 @@ def test_editorial_notes_are_removed():
     assert "()" not in cleaned
 
 
+def test_al_sp_editorial_tail_does_not_pollute_caput_or_paragraph():
+    text = (
+        "Artigo 320 - Recebido o pedido, o presidente providenciará o apensamento dos autos. (NR) - "
+        "\"Caput\" reposicionado no Título VIII, Capítulo VI, com redação dada pela Lei Complementar nº 942.\n"
+        "Parágrafo único - No processamento da revisão serão observadas as normas previstas nesta lei complementar. (NR) - "
+        "acrescentado pela Lei Complementar nº 942."
+    )
+    cleaned = clean_text(text)
+    assert "reposicionado" not in cleaned
+    assert "acrescentado pela" not in cleaned
+    assert cleaned.count("Parágrafo único") == 1
+    assert "Recebido o pedido" in cleaned
+    assert "No processamento da revisão" in cleaned
+
+
 def test_exact_lettered_article_is_not_treated_as_range():
     assert article_in_ranges("311-A", ("311-A",))
     assert not article_in_ranges("311-B", ("311-A",))
+
+
+def test_numeric_range_includes_lettered_variants():
+    assert article_in_ranges("311-A", ("311-312",))
+    assert article_in_ranges("312", ("311-312",))
+    assert not article_in_ranges("313", ("311-312",))
 
 
 def test_ranges_include_requested_articles():
@@ -105,16 +126,30 @@ def test_compile_rejects_all_sources_disabled(client):
 def test_parse_legal_units_keeps_caput_and_structures_paragraphs_and_incisos():
     device = Device(
         "5",
-        "Art. 5º Texto do caput.\n§ 1º Texto do parágrafo.\nI - Primeiro inciso.\nII - Segundo inciso."
+        "Art. 5º Texto do caput.\n§ 1º Texto do parágrafo.\nI - Primeiro inciso.\nII - Segundo inciso.\n"
+        "a) Primeira alínea.\nb) Segunda alínea."
     )
     units = parse_legal_units(device)
     assert [(kind, label) for kind, label, _ in units] == [
-        ("caput", None), ("paragraph", "§ 1º"), ("inciso", "I"), ("inciso", "II")
+        ("caput", None), ("paragraph", "§ 1º"), ("inciso", "I"), ("inciso", "II"),
+        ("alinea", "a)"), ("alinea", "b)"),
     ]
     assert "Texto do caput" in units[0][2]
 
 
-def test_render_html_contains_study_navigation_and_verbatim_article_structure():
+def test_parse_al_sp_article_has_single_paragraph():
+    device = Device(
+        "320",
+        "Artigo 320 - Recebido o pedido.\n"
+        "Parágrafo único - No processamento da revisão serão observadas as normas previstas nesta lei complementar."
+    )
+    units = parse_legal_units(device)
+    assert [(kind, label) for kind, label, _ in units] == [
+        ("caput", None), ("paragraph", "Parágrafo único")
+    ]
+
+
+def test_render_html_has_real_sumario_and_article_navigation():
     source = SOURCES[0]
     entry = type("Entry", (), {
         "source": source,
@@ -123,7 +158,7 @@ def test_render_html_contains_study_navigation_and_verbatim_article_structure():
         "error": None,
     })()
     html = render_html([entry], datetime.now(timezone.utc))
-    assert "Buscar na lei seca" in html
-    assert "Modo foco" in html
-    assert "Art. 293" in html
-    assert "Inciso" in html
+    assert "Sumário" in html
+    assert "art-cp-293" in html
+    assert "Buscar artigo, expressão ou legislação" in html
+    assert "I" in html
