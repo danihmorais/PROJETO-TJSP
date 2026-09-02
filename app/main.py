@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -139,7 +141,12 @@ async def root() -> str:
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "fontes_padrao": len(SOURCES), "persistencia": "localStorage no cliente"}
+    return {
+        "status": "ok",
+        "service": "danihmorais-github-pages",
+        "fontes_padrao": len(SOURCES),
+        "persistencia": "localStorage no cliente",
+    }
 
 
 @app.get("/api/defaults")
@@ -207,3 +214,37 @@ async def api_compilar(request: CompileRequest):
 async def compilado():
     entries, generated_at = await build_compilation(list(SOURCES))
     return HTMLResponse(render_html(entries, generated_at))
+
+
+def _load_optional_site_app():
+    """Monta o agregador principal quando os dois repositórios estão disponíveis lado a lado."""
+    site_root = Path(__file__).resolve().parents[2] / "danihmorais.github.io"
+    site_main = site_root / "main.py"
+    if not site_main.is_file():
+        return None
+
+    original_cwd = os.getcwd()
+    original_sys_path = sys.path.copy()
+    abs_site_root = site_root.resolve()
+    module_name = "universe_licitacao_main"
+    try:
+        os.chdir(abs_site_root)
+        sys.path.insert(0, str(abs_site_root))
+        spec = importlib.util.spec_from_file_location(module_name, site_main)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Não foi possível carregar {site_main}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module.app
+    finally:
+        os.chdir(original_cwd)
+        sys.path = original_sys_path
+
+
+_site_app = _load_optional_site_app()
+if _site_app is not None:
+    # Mantém compatibilidade com o serviço já configurado para este entrypoint:
+    # as rotas TJSP continuam disponíveis na raiz, enquanto o agregador fornece
+    # /licita, /monta, /email, /geradorextrato e /estudos.
+    app.mount("/", _site_app)
