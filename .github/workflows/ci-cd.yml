@@ -1,0 +1,156 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: projeto-tjsp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Testes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependências
+        run: python -m pip install -r requirements.txt
+
+      - name: Executar testes
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest -q
+
+      - name: Validar import da aplicação
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -c "from app.main import app; print(app.title)"
+
+      - name: Validar frontend estático
+        run: |
+          test -f docs/index.html
+          test -f docs/defaults.js
+          ! grep -q '__API_URL__' docs/index.html
+          grep -q 'Código Penal' docs/defaults.js
+          grep -q 'Código de Processo Penal' docs/defaults.js
+          grep -q 'Código de Processo Civil' docs/defaults.js
+          grep -q 'Lei nº 10.261/1968' docs/defaults.js
+
+  deploy:
+    name: Deploy backend e GitHub Pages
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages-deploy.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Disparar deploy do backend
+        env:
+          WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
+          API_URL: ${{ secrets.API_URL }}
+          SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+          PROJECT: PROJETO-TJSP
+        run: |
+          set -euo pipefail
+          test -n "$WEBHOOK_SECRET" || { echo 'Secret DEPLOY_WEBHOOK_SECRET não configurado.'; exit 1; }
+          test -n "$API_URL" || { echo 'Secret API_URL não configurado.'; exit 1; }
+          DEPLOY_URL="${API_URL%/}/deploy"
+
+          body=$(jq -nc \
+            --arg ref 'refs/heads/main' \
+            --arg after "$SHA" \
+            --arg repository "$REPOSITORY" \
+            --arg project "$PROJECT" \
+            '{ref:$ref,after:$after,repository:{full_name:$repository},project:$project}')
+          signature=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -hex | awk '{print $2}')
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "$DEPLOY_URL" \
+            --header 'Content-Type: application/json' \
+            --header 'X-GitHub-Event: push' \
+            --header "X-Deploy-Project: $PROJECT" \
+            --header "X-Hub-Signature-256: sha256=$signature" \
+            --data "$body"
+
+      - name: Aguardar backend
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          SHA: ${{ github.sha }}
+          PROJECT: PROJETO-TJSP
+        run: |
+          set -euo pipefail
+          test -n "$API_URL" || { echo 'Secret API_URL não configurado.'; exit 1; }
+          STATUS_URL="${API_URL%/}/deploy-status"
+
+          for i in $(seq 1 60); do
+            response=$(curl --fail --silent --show-error --get --url "$STATUS_URL" \
+              --data-urlencode "sha=$SHA" --data-urlencode "project=$PROJECT")
+            echo "[$i/60] $response"
+            state=$(printf '%s' "$response" | jq -r '.state')
+            case "$state" in
+              success) exit 0 ;;
+              failure) echo "Deploy do backend falhou."; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "Timeout aguardando o backend."
+          exit 1
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Configurar API no frontend
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$API_URL" || { echo 'Secret API_URL não configurado.'; exit 1; }
+          python - <<'PY'
+          from pathlib import Path
+          import json, os
+          path = Path('docs/index.html')
+          text = path.read_text(encoding='utf-8')
+          marker = 'const CONFIGURED_API_URL='
+          start = text.index(marker)
+          end = text.index(';', start) + 1
+          text = text[:start] + marker + json.dumps(os.environ['API_URL']) + text[end:]
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Validar configuração publicada
+        run: |
+          ! grep -q '__API_URL__' docs/index.html
+          ! grep -q 'id="backend"' docs/index.html
+          ! grep -q 'Testar conexão' docs/index.html
+          test -s docs/defaults.js
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+
+      - name: Publicar Pages
+        id: pages-deploy
+        uses: actions/deploy-pages@v4
