@@ -1,0 +1,15 @@
+[project]
+name = "projeto-tjsp"
+version = "1.0.0"
+description = "Compilador legislativo para estudos do TJSP"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.116,<1.0",
+  "uvicorn[standard]>=0.35,<1.0",
+  "httpx>=0.28,<1.0",
+  "beautifulsoup4>=4.13,<5.0",
+  "pydantic>=2.11,<3.0",
+]
+
+[tool.uvicorn]
+factory = false
