@@ -36,6 +36,7 @@ echo ""
 echo "=========================================="
 echo "$(date) - DEPLOY TJSP INICIADO"
 echo "Commit: $SHA"
+echo "Script carregado de: ${BASH_SOURCE[0]}"
 echo "Serviço: $SERVICE"
 echo "=========================================="
 
@@ -46,7 +47,7 @@ cd "$REPO"
 git fetch origin
 git cat-file -e "$SHA^{commit}" 2>/dev/null || { set_status failure "Commit não encontrado."; exit 1; }
 git checkout --force "$SHA"
-git rev-parse HEAD
+echo "HEAD após checkout: $(git rev-parse HEAD)"
 
 # Mantém os scripts usados pelo dispatcher sincronizados com o repositório.
 install -m 0755 "$REPO/deploy/deploy-tjsp.sh" "$INSTALL_ROOT/deploy-tjsp.sh.new"
@@ -70,12 +71,18 @@ for i in $(seq 1 15); do
 done
 /usr/bin/systemctl is-active --quiet "$SERVICE" || { echo "Serviço $SERVICE não iniciou."; exit 1; }
 
+# Mostra imediatamente o estado do serviço e o listener, facilitando o diagnóstico.
+echo "Estado do serviço após restart:"
+/usr/bin/systemctl is-active "$SERVICE" || true
+echo "Listeners TCP relacionados à porta 8000:"
+/usr/bin/ss -ltnp 2>/dev/null | /usr/bin/grep -E '(:8000[[:space:]]|:8000$)' || echo "Nenhum listener encontrado em 8000."
+
 # O systemd pode marcar o serviço como ativo antes de o Uvicorn estar pronto
 # para aceitar conexões. Aguarda o endpoint de health responder corretamente.
 health_check=""
 health_ok=0
 for i in $(seq 1 20); do
-    if health_check=$(/usr/bin/curl --fail --silent --show-error --max-time 3 http://127.0.0.1:8000/health 2>&1); then
+    if health_check=$(/usr/bin/curl --ipv4 --fail --silent --show-error --connect-timeout 2 --max-time 3 http://127.0.0.1:8000/health 2>&1); then
         health_ok=1
         echo "GET /health respondeu na tentativa $i/20"
         break
@@ -86,6 +93,8 @@ done
 
 if [ "$health_ok" -ne 1 ]; then
     echo "GET /health não respondeu após 20 tentativas."
+    echo "Listeners TCP no momento da falha:"
+    /usr/bin/ss -ltnp 2>/dev/null | /usr/bin/grep -E '(:8000[[:space:]]|:8000$)' || echo "Nenhum listener encontrado em 8000."
     /usr/bin/systemctl status "$SERVICE" --no-pager -l || true
     /usr/bin/journalctl -u "$SERVICE" -n 40 --no-pager || true
     set_status failure "GET /health não respondeu após 20 tentativas: ${health_check:-sem resposta}"
