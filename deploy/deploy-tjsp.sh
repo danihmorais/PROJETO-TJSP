@@ -7,6 +7,7 @@ LOG="${PROJETO_TJSP_LOG:-/home/daniel/python/deploy-tjsp.log}"
 STATUS_DIR="${DEPLOY_STATUS_DIR:-/home/daniel/python/deploy-status/PROJETO-TJSP}"
 INSTALL_ROOT="${DEPLOY_INSTALL_ROOT:-/home/daniel/python}"
 SERVICE="${PROJETO_TJSP_SERVICE:-python-api.service}"
+DOCUMENTS_DIR="${DOCUMENTOS_MODELO_DIR:-/run/media/daniel/c1eb5cb7-675f-4e8c-9564-4dabc66d9164}"
 LOCK="/tmp/projeto-tjsp-deploy.lock"
 SHA="${1:-}"
 
@@ -58,13 +59,36 @@ install -m 0644 "$REPO/deploy/deploy_server.py" "$INSTALL_ROOT/deploy_server.py"
 
 "$VENV/bin/python" -m pip install -r "$REPO/requirements.txt"
 "$VENV/bin/python" -m pip check
-PYTHONPATH="$REPO" "$VENV/bin/python" -c "from app.main import app; print(app.title)"
+PYTHONPATH="$REPO" "$VENV/bin/python" -c "from app.main import app; print(app.title); assert any(route.path == '/files' for route in app.routes)"
 
-# Reinicia o serviço FastAPI compartilhado pelo servidor.
+# Garante que o serviço existente aponte para o backend correto.
+# systemctl edit --stdin cria um drop-in sem depender do conteúdo atual da unit.
+/usr/bin/sudo -n /usr/bin/systemctl edit --stdin "$SERVICE" <<EOF
+[Service]
+WorkingDirectory=$REPO
+Environment=PYTHONPATH=$REPO
+Environment=DOCUMENTOS_MODELO_DIR=$DOCUMENTS_DIR
+ExecStart=
+ExecStart=$VENV/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+EOF
+/usr/bin/sudo -n /usr/bin/systemctl daemon-reload
+
+# Reinicia o serviço FastAPI.
 /usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
 sleep 3
 /usr/bin/systemctl is-active --quiet "$SERVICE" || { echo "Serviço $SERVICE não iniciou."; exit 1; }
 
-set_status success "Deploy concluído com sucesso"
+# Não considera o deploy concluído apenas porque o systemd está active:
+# valida a rota que o frontend realmente usa.
+api_check=$(/usr/bin/curl --fail --silent --show-error --max-time 15 http://127.0.0.1:8000/files)
+"$VENV/bin/python" - "$api_check" <<'PY'
+import json, sys
+payload = json.loads(sys.argv[1])
+if not isinstance(payload, dict) or not isinstance(payload.get("files"), list):
+    raise SystemExit("GET /files não retornou o formato esperado")
+print(f"GET /files OK ({len(payload['files'])} arquivos)")
+PY
+
+set_status success "Deploy concluído com sucesso; GET /files validado"
 echo "$(date) - DEPLOY TJSP CONCLUÍDO COM SUCESSO"
 echo "=========================================="
