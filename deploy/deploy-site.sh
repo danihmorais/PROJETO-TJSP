@@ -6,7 +6,6 @@ VENV="${DANIHMORAIS_GITHUB_PAGES_VENV:-/home/daniel/python/.venv}"
 LOG="${DANIHMORAIS_GITHUB_PAGES_LOG:-/home/daniel/python/deploy.log}"
 STATUS_DIR="${DEPLOY_STATUS_DIR:-/home/daniel/python/deploy-status}/DANIHMORAIS-GITHUB-PAGES"
 SERVICE="${DANIHMORAIS_GITHUB_PAGES_SERVICE:-python-api.service}"
-SERVICE_USER="${DANIHMORAIS_GITHUB_PAGES_USER:-daniel}"
 LOCK="/tmp/python-api-deploy.lock"
 SHA="${1:-}"
 
@@ -49,19 +48,8 @@ git rev-parse HEAD
 "$VENV/bin/python" -m pip check
 "$VENV/bin/python" -c "import main; print('IMPORT MAIN OK')"
 
-# O serviço compartilhado deve executar o agregador deste repositório.
-# Usa systemctl edit para persistir o override sem depender de gravação direta
-# em /etc/systemd/system pelo shell do deploy.
-/usr/bin/printf '%s\n' \
-    '[Service]' \
-    "User=$SERVICE_USER" \
-    "WorkingDirectory=$REPO" \
-    "Environment=PYTHONPATH=$REPO" \
-    'ExecStart=' \
-    "ExecStart=$VENV/bin/uvicorn main:app --host 0.0.0.0 --port 8000" \
-    | /usr/bin/sudo -n /usr/bin/systemctl edit --stdin "$SERVICE"
-
-/usr/bin/sudo -n /usr/bin/systemctl daemon-reload
+# Não altera a unidade systemd durante o deploy. O entrypoint já existente
+# do serviço foi tornado compatível com o agregador, portanto basta reiniciar.
 /usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
 
 for i in $(seq 1 20); do
@@ -86,6 +74,8 @@ import json, sys
 payload = json.loads(sys.argv[1])
 if not isinstance(payload, dict) or payload.get("status") != "ok":
     raise SystemExit("GET /health não retornou status=ok")
+if payload.get("service") != "danihmorais-github-pages":
+    raise SystemExit("GET /health não identifica o agregador esperado")
 PY
 
 estudos_check=$(/usr/bin/curl --ipv4 --fail --silent --show-error --max-time 10 http://127.0.0.1:8000/estudos/health)
@@ -95,6 +85,11 @@ payload = json.loads(sys.argv[1])
 if not isinstance(payload, dict) or payload.get("status") != "ok":
     raise SystemExit("/estudos/health não retornou status=ok")
 PY
+
+for endpoint in /licita/openapi.json /monta/openapi.json /email/openapi.json /geradorextrato/openapi.json; do
+    /usr/bin/curl --ipv4 --fail --silent --show-error --max-time 10 --output /dev/null "http://127.0.0.1:8000$endpoint"
+    echo "$endpoint OK"
+done
 
 echo "GET /health OK"
 echo "GET /estudos/health OK"
