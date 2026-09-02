@@ -24,33 +24,49 @@ EDITORIAL_NOTE_RE = re.compile(
 EDITORIAL_VIDE_RE = re.compile(r"\s*\(\s*Vide\b[^()\n]*\)", re.IGNORECASE)
 EDITORIAL_STATUS_RE = re.compile(r"\s*\(\s*(?:Vigência|Produção de efeitos|NR)\s*\)", re.IGNORECASE)
 
-# Anotações da AL-SP frequentemente aparecem depois de um hífen, por exemplo:
-# "Artigo 319 ... (NR) - Artigo 319 com redação dada ...".
-EDITORIAL_TAIL_RE = re.compile(
-    r"\s*(?:[-–—]\s*)?(?:\(?NR\)?\s*[-–—]\s*)?"
-    r"(?:Artigo|Art\.?)[ \t]*\d+(?:-[A-Za-z]+)?[º°]?[ \t]+"
-    r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
-    r"alterado|alterada|transformado|transformada)\b.*$",
-    re.IGNORECASE,
-)
-EDITORIAL_PARAGRAPH_TAIL_RE = re.compile(
-    r"\s*(?:[-–—]\s*)?(?:Parágrafo\s+único|§\s*\d+[º°]?)[ \t]+"
-    r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
-    r"alterado|alterada|transformado|transformada)\b.*$",
-    re.IGNORECASE,
+# A AL-SP publica anotações depois do texto, muitas vezes na própria linha:
+# "... (NR) - Artigo 319 com redação dada ..."
+# ou "... (NR) - acrescentado pela ...".
+EDITORIAL_TAIL_PATTERNS = (
+    re.compile(
+        r"\s*(?:[-–—]\s*)?(?:\(?NR\)?\s*[-–—]\s*)?"
+        r"(?:Artigo|Art\.?)[ \t]*\d+(?:-[A-Za-z]+)?[º°]?[ \t]+"
+        r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
+        r"alterado|alterada|transformado|transformada)\b.*$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\s*(?:[-–—]\s*)?(?:[\"“”']?Caput[\"“”']?)[ \t]+"
+        r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
+        r"alterado|alterada|transformado|transformada)\b.*$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\s*[-–—][ \t]*(?:acrescentado|acrescentada|incluído|incluída|revogado|revogada|"
+        r"alterado|alterada|renumerado|renumerada|transformado|transformada|"
+        r"suprimido|suprimida)\b.*$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\s*(?:[-–—]\s*)?(?:Parágrafo\s+único|§\s*\d+[º°]?)[ \t]+"
+        r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
+        r"alterado|alterada|transformado|transformada)\b.*$",
+        re.IGNORECASE,
+    ),
 )
 EDITORIAL_BLOCK_RE = re.compile(
     r"^(?:[-–—]\s*)?(?:\(?NR\)?|(?:Artigo|Art\.?)[ \t]*\d+(?:-[A-Za-z]+)?[º°]?[ \t]+"
     r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
     r"alterado|alterada|transformado|transformada)|(?:Parágrafo\s+único|§\s*\d+[º°]?)"
     r"[ \t]+(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
+    r"alterado|alterada|transformado|transformada)|[\"“”']?Caput[\"“”']?[ \t]+"
+    r"(?:com redação|reposicionado|renumerado|revogado|acrescentado|incluído|incluída|"
     r"alterado|alterada|transformado|transformada))\b.*$",
     re.IGNORECASE,
 )
 
 ARTICLE_RE = re.compile(
-    r"(?mi)^[ \t]*(?:Art\.?|Artigo)\s*(\d+(?:-[A-Za-z]+)?)[º°]?"
-    r"\s*(?:[—–-]\s*)?"
+    r"(?mi)^[ \t]*(?:Art\.?|Artigo)\s*(\d+(?:-[A-Za-z]+)?)[º°]?\s*(?:[—–-]\s*)?"
 )
 
 
@@ -64,8 +80,8 @@ def _strip_editorial_tails(text: str) -> str:
     previous = None
     while previous != text:
         previous = text
-        text = EDITORIAL_TAIL_RE.sub("", text)
-        text = EDITORIAL_PARAGRAPH_TAIL_RE.sub("", text)
+        for pattern in EDITORIAL_TAIL_PATTERNS:
+            text = pattern.sub("", text)
     return text
 
 
