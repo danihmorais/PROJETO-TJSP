@@ -5,6 +5,8 @@ REPO="${DANIHMORAIS_GITHUB_PAGES_REPO:-/home/daniel/Downloads/danihmorais.github
 VENV="${DANIHMORAIS_GITHUB_PAGES_VENV:-/home/daniel/python/.venv}"
 LOG="${DANIHMORAIS_GITHUB_PAGES_LOG:-/home/daniel/python/deploy.log}"
 STATUS_DIR="${DEPLOY_STATUS_DIR:-/home/daniel/python/deploy-status}/DANIHMORAIS-GITHUB-PAGES"
+INSTALL_ROOT="${DEPLOY_INSTALL_ROOT:-/home/daniel/python}"
+SERVICE="${DANIHMORAIS_GITHUB_PAGES_SERVICE:-python-api.service}"
 LOCK="/tmp/danihmorais-github-pages-deploy.lock"
 SHA="${1:-}"
 
@@ -29,6 +31,7 @@ echo ""
 echo "=========================================="
 echo "$(date) - DEPLOY SITE INICIADO"
 echo "Commit: $SHA"
+echo "Serviço: $SERVICE"
 echo "=========================================="
 
 exec 200>"$LOCK"
@@ -44,9 +47,9 @@ git rev-parse HEAD
 "$VENV/bin/python" -m pip check
 "$VENV/bin/python" -c "import main; print('IMPORT MAIN OK')"
 
-sudo systemctl restart fastapi
+/usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
 sleep 3
-systemctl is-active --quiet fastapi || { echo "FastAPI não iniciou."; exit 1; }
+/usr/bin/systemctl is-active --quiet "$SERVICE" || { echo "Serviço $SERVICE não iniciou."; exit 1; }
 
 set_status success "Deploy concluído com sucesso"
 echo "$(date) - DEPLOY SITE CONCLUÍDO COM SUCESSO"
