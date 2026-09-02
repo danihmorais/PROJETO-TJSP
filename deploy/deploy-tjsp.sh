@@ -1,0 +1,62 @@
+#!/bin/bash
+set -euo pipefail
+
+REPO="${PROJETO_TJSP_REPO:-/home/daniel/Downloads/PROJETO-TJSP}"
+VENV="${PROJETO_TJSP_VENV:-/home/daniel/python/.venv}"
+LOG="${PROJETO_TJSP_LOG:-/home/daniel/python/deploy-tjsp.log}"
+STATUS_DIR="${DEPLOY_STATUS_DIR:-/home/daniel/python/deploy-status/PROJETO-TJSP}"
+LOCK="/tmp/projeto-tjsp-deploy.lock"
+SHA="${1:-}"
+
+if [ -z "$SHA" ]; then
+    echo "SHA não informado"
+    exit 1
+fi
+
+mkdir -p "$STATUS_DIR"
+STATUS_FILE="$STATUS_DIR/$SHA.json"
+
+set_status() {
+    local state="$1"
+    local message="$2"
+    /usr/bin/python3 - "$SHA" "$state" "$message" "$STATUS_FILE" <<'PY'
+import json, sys
+sha, state, message, path = sys.argv[1:]
+with open(path, "w", encoding="utf-8") as f:
+    json.dump({"project":"PROJETO-TJSP","sha":sha,"state":state,"message":message}, f, ensure_ascii=False)
+PY
+}
+
+exec >> "$LOG" 2>&1
+trap 'echo "$(date) - DEPLOY TJSP FALHOU"; set_status failure "Deploy falhou. Consulte deploy-tjsp.log."' ERR
+
+echo ""
+echo "=========================================="
+echo "$(date) - DEPLOY TJSP INICIADO"
+echo "Commit: $SHA"
+echo "=========================================="
+
+exec 200>"$LOCK"
+flock -n 200 || { set_status failure "Outro deploy do TJSP já está em execução."; exit 1; }
+
+cd "$REPO"
+git fetch origin
+
+git cat-file -e "$SHA^{commit}" 2>/dev/null || { set_status failure "Commit não encontrado."; exit 1; }
+
+git checkout --force "$SHA"
+
+git rev-parse HEAD
+
+"$VENV/bin/python" -m pip install -r "$REPO/requirements.txt"
+"$VENV/bin/python" -m pip check
+PYTHONPATH="$REPO" "$VENV/bin/python" -c "from app.main import app; print(app.title)"
+
+# O agregador FastAPI é reiniciado para carregar a nova versão do TJSP.
+sudo systemctl restart fastapi
+sleep 3
+systemctl is-active --quiet fastapi || { echo "FastAPI não iniciou."; exit 1; }
+
+set_status success "Deploy concluído com sucesso"
+echo "$(date) - DEPLOY TJSP CONCLUÍDO COM SUCESSO"
+echo "=========================================="
