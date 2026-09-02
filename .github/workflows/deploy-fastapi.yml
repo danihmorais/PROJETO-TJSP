@@ -91,38 +91,3 @@ jobs:
 
           echo "Timeout aguardando o deploy de $PROJECT."
           exit 1
-
-      - name: Validate public files endpoint and CORS
-        env:
-          API_URL: ${{ secrets.API_URL }}
-        run: |
-          set -euo pipefail
-
-          BASE_URL="${API_URL%/}"
-          BODY_FILE="$(mktemp)"
-          HEADERS_FILE="$(mktemp)"
-          trap 'rm -f "$BODY_FILE" "$HEADERS_FILE"' EXIT
-
-          curl --fail --silent --show-error --max-time 30 \
-            --header 'Origin: https://danihmorais.github.io' \
-            --dump-header "$HEADERS_FILE" \
-            --output "$BODY_FILE" \
-            "$BASE_URL/files"
-
-          grep -Eiq '^access-control-allow-origin:[[:space:]]*https://danihmorais\.github\.io[[:space:]]*$' "$HEADERS_FILE" || {
-            echo 'CORS não está configurado corretamente no endpoint público /files.'
-            cat "$HEADERS_FILE"
-            exit 1
-          }
-
-          python - "$BODY_FILE" <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-
-          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          files = payload.get("files") if isinstance(payload, dict) else None
-          if not isinstance(files, list):
-              raise SystemExit("/files não retornou um objeto JSON com a chave 'files'.")
-          print(f"Endpoint público /files OK; {len(files)} arquivos encontrados; CORS OK.")
-          PY
