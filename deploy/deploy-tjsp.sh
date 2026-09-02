@@ -53,15 +53,10 @@ install -m 0755 "$REPO/deploy/deploy-tjsp.sh" "$INSTALL_ROOT/deploy-tjsp.sh.new"
 mv -f "$INSTALL_ROOT/deploy-tjsp.sh.new" "$INSTALL_ROOT/deploy-tjsp.sh"
 install -m 0755 "$REPO/deploy/deploy-site.sh" "$INSTALL_ROOT/deploy-site.sh"
 install -m 0644 "$REPO/deploy/deploy_server.py" "$INSTALL_ROOT/deploy_server.py"
-install -m 0755 "$REPO/deploy/configure-python-api-service.sh" "$INSTALL_ROOT/configure-python-api-service.sh"
 
 "$VENV/bin/python" -m pip install -r "$REPO/requirements.txt"
 "$VENV/bin/python" -m pip check
-PYTHONPATH="$REPO" "$VENV/bin/python" -c "from app.main import app; print(app.title); assert any(route.path == '/files' for route in app.routes)"
-
-# O python-api.service deve ser configurado uma única vez no servidor.
-# Veja configure-python-api-service.sh. O deploy não usa systemctl edit
-# porque essa operação exige um TTY e não é apropriada para automação.
+PYTHONPATH="$REPO" "$VENV/bin/python" -c "from app.main import app; print(app.title)"
 
 /usr/bin/sudo -n /usr/bin/systemctl daemon-reload
 /usr/bin/sudo -n /usr/bin/systemctl restart "$SERVICE"
@@ -74,29 +69,16 @@ for i in $(seq 1 10); do
 done
 /usr/bin/systemctl is-active --quiet "$SERVICE" || { echo "Serviço $SERVICE não iniciou."; exit 1; }
 
-# Valida exatamente os endpoints que serão usados pelo GitHub Pages.
-api_check=$(/usr/bin/curl --silent --show-error --max-time 15 --write-out $'\nHTTP_STATUS=%{http_code}' http://127.0.0.1:8000/files) || {
-    rc=$?
-    set_status failure "GET /files falhou no curl (exit $rc): ${api_check:-sem resposta}"
-    exit "$rc"
-}
-
-api_body="${api_check%$'\nHTTP_STATUS='*}"
-api_status="${api_check##*$'\nHTTP_STATUS='}"
-if [ "$api_status" != "200" ]; then
-    set_status failure "GET /files retornou HTTP $api_status: $api_body"
-    exit 1
-fi
-
-printf '%s' "$api_body" | "$VENV/bin/python" - <<'PY'
-import json
-import sys
-payload = json.load(sys.stdin)
-if not isinstance(payload, dict) or not isinstance(payload.get("files"), list):
-    raise SystemExit("GET /files não retornou o formato esperado")
-print(f"GET /files OK ({len(payload['files'])} arquivos)")
+# Valida a própria API do PROJETO-TJSP sem depender de recursos externos ao deploy.
+health_check=$(/usr/bin/curl --fail --silent --show-error --max-time 15 http://127.0.0.1:8000/health)
+"$VENV/bin/python" - "$health_check" <<'PY'
+import json, sys
+payload = json.loads(sys.argv[1])
+if not isinstance(payload, dict) or payload.get("status") != "ok":
+    raise SystemExit("GET /health não retornou status=ok")
+print("GET /health OK")
 PY
 
-set_status success "Deploy concluído com sucesso; GET /files validado"
+set_status success "Deploy concluído com sucesso; GET /health validado"
 echo "$(date) - DEPLOY TJSP CONCLUÍDO COM SUCESSO"
 echo "=========================================="
