@@ -44,13 +44,15 @@ jobs:
 
       - name: Validar frontend estático
         run: |
+          set -euo pipefail
           test -f docs/index.html
           test -f docs/defaults.js
-          ! grep -q '__API_URL__' docs/index.html
+          grep -q 'const CONFIGURED_API_URL=__API_URL__;' docs/index.html
           grep -q 'Código Penal' docs/defaults.js
           grep -q 'Código de Processo Penal' docs/defaults.js
           grep -q 'Código de Processo Civil' docs/defaults.js
           grep -q 'Lei nº 10.261/1968' docs/defaults.js
+          grep -q 'Lei nº 8.429/1992' docs/defaults.js
 
   deploy:
     name: Deploy backend e GitHub Pages
@@ -110,13 +112,15 @@ jobs:
             echo "[$i/60] $response"
             state=$(printf '%s' "$response" | jq -r '.state')
             case "$state" in
-              success) exit 0 ;;
+              success) break ;;
               failure) echo "Deploy do backend falhou."; exit 1 ;;
             esac
+            if [ "$i" -eq 60 ]; then
+              echo "Timeout aguardando o backend."
+              exit 1
+            fi
             sleep 10
           done
-          echo "Timeout aguardando o backend."
-          exit 1
 
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
@@ -139,12 +143,14 @@ jobs:
           path.write_text(text, encoding='utf-8')
           PY
 
-      - name: Validar configuração publicada
+      - name: Validar publicação
         run: |
+          set -euo pipefail
           ! grep -q '__API_URL__' docs/index.html
           ! grep -q 'id="backend"' docs/index.html
           ! grep -q 'Testar conexão' docs/index.html
-          test -s docs/defaults.js
+          grep -q 'Código Penal' docs/defaults.js
+          grep -q 'Lei nº 9.099/1995' docs/defaults.js
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
