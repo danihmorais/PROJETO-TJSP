@@ -140,6 +140,8 @@ def render_html(entries: list[CompilationEntry], generated_at: datetime) -> str:
 
     for entry in entries:
         if entry.source.subject != current_subject:
+            if current_subject is not None:
+                body.append("</section>")
             current_subject = entry.source.subject
             body.append(
                 f"<section class='subject' id='subject-{_slug(current_subject)}'>"
