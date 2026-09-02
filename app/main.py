@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from .config import SOURCES, Source
@@ -23,6 +25,7 @@ app.add_middleware(
 )
 
 OFFICIAL_SUFFIXES = (".gov.br", ".leg.br", ".jus.br")
+DEFAULT_FILES_DIR = "/run/media/daniel/c1eb5cb7-675f-4e8c-9564-4dabc66d9164"
 
 
 class SourceInput(BaseModel):
@@ -83,6 +86,26 @@ def source_from_input(item: SourceInput) -> Source:
     return Source(item.key, item.subject, item.title, str(item.url), tuple(item.article_ranges), item.full_document)
 
 
+def files_root() -> Path:
+    configured = os.environ.get("DOCUMENTOS_MODELO_DIR", DEFAULT_FILES_DIR).strip()
+    if not configured:
+        raise HTTPException(status_code=500, detail="DOCUMENTOS_MODELO_DIR não está configurado")
+    root = Path(configured).expanduser().resolve()
+    if not root.is_dir():
+        raise HTTPException(status_code=503, detail="Diretório de documentos modelo indisponível")
+    return root
+
+
+def relative_file_path(root: Path, requested_path: str) -> Path:
+    clean_path = requested_path.replace("\\", "/").lstrip("/")
+    candidate = (root / clean_path).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Caminho de arquivo inválido") from exc
+    return candidate
+
+
 async def build_compilation(sources: list[Source]) -> tuple[list[CompilationEntry], datetime]:
     if not sources:
         raise HTTPException(status_code=400, detail="Nenhuma legislação habilitada")
@@ -127,6 +150,43 @@ async def defaults():
 @app.get("/fontes")
 async def fontes():
     return [source_to_dict(source) for source in SOURCES]
+
+
+@app.get("/files")
+async def list_files():
+    root = files_root()
+    files = []
+    for path in root.rglob("*"):
+        try:
+            is_file = path.is_file()
+        except OSError:
+            continue
+        if not is_file:
+            continue
+        relative = path.relative_to(root).as_posix()
+        try:
+            size = path.stat().st_size
+        except OSError:
+            size = None
+        files.append({
+            "name": path.name,
+            "path": relative,
+            "type": "file",
+            "size": size,
+            "url": f"/files/{relative}",
+        })
+
+    files.sort(key=lambda item: item["path"].casefold())
+    return {"files": files}
+
+
+@app.get("/files/{requested_path:path}")
+async def download_file(requested_path: str):
+    root = files_root()
+    candidate = relative_file_path(root, requested_path)
+    if not candidate.is_file():
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+    return FileResponse(candidate, filename=candidate.name)
 
 
 @app.post("/api/compilar")
