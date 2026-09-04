@@ -82,6 +82,65 @@ class Device:
     text: str
 
 
+def _detect_declared_encoding(response: httpx.Response) -> str | None:
+    """Detecta charset HTTP/HTML sem confiar cegamente em response.text."""
+    content_type = response.headers.get("content-type", "")
+    match = re.search(r"charset\s*=\s*[\"']?\s*([\w.-]+)", content_type, re.IGNORECASE)
+    if match:
+        return match.group(1).strip().lower()
+
+    head = response.content[:8192].decode("ascii", errors="ignore")
+    match = re.search(r"<meta[^>]+charset\s*=\s*[\"']?\s*([\w.-]+)", head, re.IGNORECASE)
+    if match:
+        return match.group(1).strip().lower()
+
+    match = re.search(
+        r"<meta[^>]+content\s*=\s*[\"'][^\"']*charset\s*=\s*([\w.-]+)",
+        head,
+        re.IGNORECASE,
+    )
+    return match.group(1).strip().lower() if match else None
+
+
+def _normalize_encoding_name(value: str | None) -> str | None:
+    if not value:
+        return None
+    normalized = value.lower().replace("_", "-")
+    aliases = {
+        "latin1": "iso-8859-1",
+        "latin-1": "iso-8859-1",
+        "iso8859-1": "iso-8859-1",
+        "windows1252": "windows-1252",
+        "cp1252": "windows-1252",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _decode_html_response(response: httpx.Response) -> str:
+    """Decodifica HTML antigo do Planalto sem introduzir U+FFFD nos acentos."""
+    raw = response.content
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return raw.decode("utf-8-sig")
+
+    declared = _normalize_encoding_name(_detect_declared_encoding(response))
+    candidates: list[str] = ["utf-8"]
+    if declared and declared not in candidates:
+        candidates.append(declared)
+    for fallback in ("windows-1252", "iso-8859-1"):
+        if fallback not in candidates:
+            candidates.append(fallback)
+
+    for encoding in candidates:
+        try:
+            decoded = raw.decode(encoding, errors="strict")
+        except (LookupError, UnicodeDecodeError):
+            continue
+        if "\ufffd" not in decoded:
+            return decoded
+
+    return raw.decode("utf-8", errors="replace")
+
+
 def _strip_editorial_tails(text: str) -> str:
     previous = None
     while previous != text:
@@ -185,7 +244,7 @@ async def _fetch_html(client: httpx.AsyncClient, source: Source) -> str:
                     await asyncio.sleep(0.5 * (2**attempt))
                     continue
                 response.raise_for_status()
-                html = response.text
+                html = _decode_html_response(response)
                 if not _is_probable_legislation_response(html, source):
                     errors.append(f"{url} -> resposta sem artigos reconhecíveis")
                     break
