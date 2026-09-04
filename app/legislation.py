@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from bs4 import BeautifulSoup
@@ -66,8 +67,12 @@ EDITORIAL_BLOCK_RE = re.compile(
 )
 
 ARTICLE_RE = re.compile(
-    r"(?mi)^[ \t]*(?:Art\.?|Artigo)\s*(\d+(?:-[A-Za-z]+)?)[º°]?\s*(?:[—–-]\s*)?"
+    r"(?mi)^[ \t]*(?:[>•·*]+\s*)?(?:Art(?:igo)?\.?)\s*"
+    r"(\d+(?:-[A-Za-z]+)?)[º°]?\s*(?:[.·—–-]\s*)?"
 )
+
+RETRYABLE_STATUS_CODES = {403, 408, 425, 429, 500, 502, 503, 504}
+PLANALTO_HOSTS = {"www.planalto.gov.br", "planalto.gov.br"}
 
 
 @dataclass(frozen=True)
@@ -136,6 +141,68 @@ def article_in_ranges(number: str, ranges: tuple[str, ...]) -> bool:
     return False
 
 
+def source_url_candidates(url: str) -> tuple[str, ...]:
+    """Retorna a URL original e, para Planalto, a variante com/sem www."""
+    parsed = urlsplit(url)
+    host = (parsed.hostname or "").lower()
+    candidates = [url]
+    if host in PLANALTO_HOSTS:
+        alternate_host = "planalto.gov.br" if host == "www.planalto.gov.br" else "www.planalto.gov.br"
+        candidates.append(
+            urlunsplit((parsed.scheme, alternate_host, parsed.path, parsed.query, parsed.fragment))
+        )
+    return tuple(dict.fromkeys(candidates))
+
+
+def _is_probable_legislation_response(html: str, source: Source) -> bool:
+    """Evita aceitar página de bloqueio/intersticial como se fosse uma lei válida."""
+    if not html or len(html.strip()) < 100:
+        return False
+    devices = extract_articles(html, source)
+    return bool(devices) or (not source.article_ranges and source.full_document)
+
+
+async def _fetch_html(client: httpx.AsyncClient, source: Source) -> str:
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.6",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Referer": "https://www.planalto.gov.br/",
+        "User-Agent": (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+        ),
+    }
+    errors: list[str] = []
+
+    for url in source_url_candidates(source.url):
+        for attempt in range(3):
+            try:
+                response = await client.get(url, headers=headers)
+                status = response.status_code
+                if status in RETRYABLE_STATUS_CODES and attempt < 2:
+                    await asyncio.sleep(0.5 * (2**attempt))
+                    continue
+                response.raise_for_status()
+                html = response.text
+                if not _is_probable_legislation_response(html, source):
+                    errors.append(f"{url} -> resposta sem artigos reconhecíveis")
+                    break
+                return html
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code if exc.response is not None else "?"
+                errors.append(f"{url} -> HTTP {status}")
+                if status not in RETRYABLE_STATUS_CODES:
+                    break
+            except httpx.HTTPError as exc:
+                errors.append(f"{url} -> {exc.__class__.__name__}: {exc}")
+                break
+
+    detail = "; ".join(errors[-8:]) or "resposta vazia"
+    raise RuntimeError(f"Não foi possível consultar a legislação oficial: {detail}")
+
+
 def extract_articles(html: str, source: Source) -> list[Device]:
     soup = BeautifulSoup(html, "html.parser")
     for node in soup(["script", "style", "noscript", "del", "s", "strike"]):
@@ -143,8 +210,11 @@ def extract_articles(html: str, source: Source) -> list[Device]:
     for node in soup.find_all(style=re.compile(r"line-through", re.IGNORECASE)):
         node.decompose()
 
+    text = soup.get_text("\n", strip=False).replace("\xa0", " ")
     text = "\n".join(
-        line.strip() for line in soup.get_text("\n").splitlines() if line.strip()
+        re.sub(r"[ \t]+", " ", line).strip()
+        for line in text.splitlines()
+        if line.strip()
     )
     matches = list(ARTICLE_RE.finditer(text))
 
@@ -167,10 +237,7 @@ def extract_articles(html: str, source: Source) -> list[Device]:
 
 
 async def fetch_source(source: Source) -> tuple[list[Device], datetime]:
-    headers = {
-        "User-Agent": "PROJETO-TJSP/1.0 (ferramenta educacional; contato via GitHub)"
-    }
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers=headers) as client:
-        response = await client.get(source.url)
-        response.raise_for_status()
-    return extract_articles(response.text, source), datetime.now(timezone.utc)
+    timeout = httpx.Timeout(30.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        html = await _fetch_html(client, source)
+    return extract_articles(html, source), datetime.now(timezone.utc)
