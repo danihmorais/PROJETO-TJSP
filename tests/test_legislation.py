@@ -1,10 +1,18 @@
 from datetime import datetime, timezone
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from app.config import SOURCES
-from app.legislation import Device, article_in_ranges, clean_text, extract_articles
+from app.legislation import (
+    Device,
+    _fetch_html,
+    article_in_ranges,
+    clean_text,
+    extract_articles,
+    source_url_candidates,
+)
 from app.main import app
 from app.render import parse_legal_units, render_html
 
@@ -78,6 +86,58 @@ def test_extracts_lei_10261_artigo_marker():
     assert [item.number for item in result] == ["1", "2"]
 
 
+def test_extracts_planalto_article_variants_and_nonbreaking_space():
+    source = next(s for s in SOURCES if s.key == "cp")
+    html = (
+        "<html><body>"
+        "<p>Art.\xa0293 - Primeiro texto.</p>"
+        "<p>Art 294. Segundo texto.</p>"
+        "<p>• Art. 295 - Terceiro texto.</p>"
+        "<p>Conforme o art. 296, não é um novo dispositivo.</p>"
+        "</body></html>"
+    )
+    result = extract_articles(html, source)
+    assert [item.number for item in result] == ["293", "294", "295"]
+
+
+def test_planalto_url_candidates_include_both_official_hosts():
+    url = "https://www.planalto.gov.br/ccivil_03/decreto-lei/del2848.htm"
+    assert source_url_candidates(url) == (
+        url,
+        "https://planalto.gov.br/ccivil_03/decreto-lei/del2848.htm",
+    )
+
+
+def test_non_planalto_url_is_not_rewritten():
+    url = "https://www.al.sp.gov.br/repositorio/legislacao/lei/1968/compilacao.html"
+    assert source_url_candidates(url) == (url,)
+
+
+def test_fetch_html_falls_back_to_planalto_without_www(monkeypatch):
+    source = next(s for s in SOURCES if s.key == "cp")
+    requested: list[str] = []
+
+    async def no_sleep(_delay: float):
+        return None
+
+    class FakeClient:
+        async def get(self, url: str, headers: dict):
+            requested.append(url)
+            if url.startswith("https://www.planalto.gov.br/"):
+                return httpx.Response(403, request=httpx.Request("GET", url))
+            return httpx.Response(
+                200,
+                text="<html><body><p>Art. 293 - Falsificar, fabricando-os ou alterando-os.</p></body></html>",
+                request=httpx.Request("GET", url),
+            )
+
+    monkeypatch.setattr("app.legislation.asyncio.sleep", no_sleep)
+    html = __import__("asyncio").run(_fetch_html(FakeClient(), source))
+    assert "Art. 293" in html
+    assert requested[:3] == [source.url, source.url, source.url]
+    assert requested[3] == "https://planalto.gov.br/ccivil_03/decreto-lei/del2848.htm"
+
+
 def test_constitution_scope_matches_notice():
     source = next(s for s in SOURCES if s.key == "cf")
     assert source.article_ranges == ("5-17", "37-41", "92")
@@ -123,7 +183,7 @@ def test_compile_rejects_all_sources_disabled(client):
     assert response.json()["detail"] == "Nenhuma legislação habilitada"
 
 
-def test_parse_legal_units_keeps_caput_and_structures_paragraphs_and_incisos():
+def test_parse_legal_units_keeps_caput_and_structures_paragraphs_and_incises():
     device = Device(
         "5",
         "Art. 5º Texto do caput.\n§ 1º Texto do parágrafo.\nI - Primeiro inciso.\nII - Segundo inciso.\n"
