@@ -22,9 +22,18 @@ UNIT_RE = re.compile(
     r"[IVXLCDM]{1,8}\s*[.)—–-]\s+|[a-z]\s*[.)—–-]\s+)",
     re.IGNORECASE,
 )
-INLINE_UNIT_RE = re.compile(
-    r"(?=\s+(?:§\s*\d+[º°]?\s*[—–-]?|Parágrafo\s+único\.?\s*[—–-]?|"
-    r"[IVXLCDM]{1,8}\s*[.)—–-]\s+|[a-z]\s*[.)—–-]\s+))",
+
+# Alguns portais retornam mais de uma unidade normativa na mesma linha.
+# Só fazemos a separação inline quando o marcador é precedido por ':' ou ';'.
+# Isso evita confundir referências como "n. I", "art. 5º" ou "a. título" com
+# uma nova unidade jurídica.
+INLINE_UNIT_BOUNDARY_RE = re.compile(
+    r"(?P<prefix>[;:])(?P<space>[ \t]+)(?="
+    r"(?:§\s*\d+[º°]?\s*[—–-]?|"
+    r"Parágrafo\s+único\.?\s*[—–-]?|"
+    r"[IVXLCDM]{1,8}\s*[.)—–-]\s+|"
+    r"[a-z]\s*[.)—–-]\s+)"
+    r")",
     re.IGNORECASE,
 )
 
@@ -50,9 +59,9 @@ def _unit_label(marker: str) -> str:
 
 
 def _split_line(line: str) -> list[str]:
-    """Split multiple legal units only when an explicit unit marker exists."""
-    parts = [part.strip() for part in INLINE_UNIT_RE.split(line) if part.strip()]
-    return parts or [line.strip()]
+    """Split inline legal units only at explicit normative boundaries."""
+    expanded = INLINE_UNIT_BOUNDARY_RE.sub(lambda match: f"{match.group('prefix')}\n", line)
+    return [part.strip() for part in expanded.splitlines() if part.strip()] or [line.strip()]
 
 
 def parse_legal_units(device: Device) -> list[tuple[str, str | None, str]]:
