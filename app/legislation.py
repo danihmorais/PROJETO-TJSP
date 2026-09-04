@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -158,8 +159,7 @@ def _is_probable_legislation_response(html: str, source: Source) -> bool:
     """Evita aceitar página de bloqueio/intersticial como se fosse uma lei válida."""
     if not html or len(html.strip()) < 100:
         return False
-    devices = extract_articles(html, source)
-    return bool(devices) or (not source.article_ranges and source.full_document)
+    return bool(extract_articles(html, source))
 
 
 async def _fetch_html(client: httpx.AsyncClient, source: Source) -> str:
